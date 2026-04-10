@@ -19,6 +19,10 @@ extension VoiceInkEngine: PowerModeStateProvider {
         whisperModelManager.availableModels
     }
 
+    var availableQwenModels: [QwenLocalModel] {
+        qwenModelManager.availableModels
+    }
+
     func setDefaultTranscriptionModel(_ model: any TranscriptionModel) {
         transcriptionModelManager.setDefaultTranscriptionModel(model)
     }
@@ -29,5 +33,9 @@ extension VoiceInkEngine: PowerModeStateProvider {
 
     func loadModel(_ model: WhisperModel) async throws {
         try await whisperModelManager.loadModel(model)
+    }
+
+    func loadQwenModel(_ model: QwenLocalModel) async throws {
+        try await qwenModelManager.loadModel(model)
     }
 }

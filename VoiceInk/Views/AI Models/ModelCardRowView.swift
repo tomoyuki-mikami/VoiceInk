@@ -42,6 +42,18 @@ struct ModelCardRowView: View {
                         setDefaultAction: setDefaultAction
                     )
                 }
+            case .qwen3:
+                if let qwenModel = model as? QwenLocalModel {
+                    QwenModelCardView(
+                        model: qwenModel,
+                        isDownloaded: isDownloaded,
+                        isCurrent: isCurrent,
+                        isPreparing: downloadProgress.keys.contains(qwenModel.name),
+                        deleteAction: deleteAction,
+                        setDefaultAction: setDefaultAction,
+                        downloadAction: downloadAction
+                    )
+                }
             case .fluidAudio:
                 if let fluidAudioModel = model as? FluidAudioModel {
                     FluidAudioModelCardRowView(

@@ -14,6 +14,7 @@ struct VoiceInkApp: App {
 
     @StateObject private var engine: VoiceInkEngine
     @StateObject private var whisperModelManager: WhisperModelManager
+    @StateObject private var qwenModelManager: QwenModelManager
     @StateObject private var fluidAudioModelManager: FluidAudioModelManager
     @StateObject private var transcriptionModelManager: TranscriptionModelManager
     @StateObject private var recorderUIManager: RecorderUIManager
@@ -103,12 +104,15 @@ struct VoiceInkApp: App {
         let appSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("com.prakashjoshipax.VoiceInk")
         let modelsDirectory = appSupportDirectory.appendingPathComponent("WhisperModels")
+        let qwenModelsDirectory = appSupportDirectory.appendingPathComponent("QwenModels")
 
         // 2. Create model managers
         let whisperModelManager = WhisperModelManager(modelsDirectory: modelsDirectory)
+        let qwenModelManager = QwenModelManager(modelsDirectory: qwenModelsDirectory)
         let fluidAudioModelManager = FluidAudioModelManager()
         let transcriptionModelManager = TranscriptionModelManager(
             whisperModelManager: whisperModelManager,
+            qwenModelManager: qwenModelManager,
             fluidAudioModelManager: fluidAudioModelManager
         )
 
@@ -119,6 +123,7 @@ struct VoiceInkApp: App {
         let engine = VoiceInkEngine(
             modelContext: container.mainContext,
             whisperModelManager: whisperModelManager,
+            qwenModelManager: qwenModelManager,
             transcriptionModelManager: transcriptionModelManager,
             enhancementService: enhancementService
         )
@@ -131,10 +136,13 @@ struct VoiceInkApp: App {
         // refreshAllAvailableModels must run before loadCurrentTranscriptionModel so imported models are present when restoring the saved selection.
         whisperModelManager.createModelsDirectoryIfNeeded()
         whisperModelManager.loadAvailableModels()
+        qwenModelManager.createModelsDirectoryIfNeeded()
+        qwenModelManager.refreshAvailableModels()
         transcriptionModelManager.refreshAllAvailableModels()
         transcriptionModelManager.loadCurrentTranscriptionModel()
 
         _whisperModelManager = StateObject(wrappedValue: whisperModelManager)
+        _qwenModelManager = StateObject(wrappedValue: qwenModelManager)
         _fluidAudioModelManager = StateObject(wrappedValue: fluidAudioModelManager)
         _transcriptionModelManager = StateObject(wrappedValue: transcriptionModelManager)
         _recorderUIManager = StateObject(wrappedValue: recorderUIManager)
@@ -155,6 +163,7 @@ struct VoiceInkApp: App {
         let prewarmService = ModelPrewarmService(
             transcriptionModelManager: transcriptionModelManager,
             whisperModelManager: whisperModelManager,
+            qwenModelManager: qwenModelManager,
             modelContext: container.mainContext
         )
         _prewarmService = StateObject(wrappedValue: prewarmService)
@@ -252,6 +261,7 @@ struct VoiceInkApp: App {
                 ContentView()
                     .environmentObject(engine)
                     .environmentObject(whisperModelManager)
+                    .environmentObject(qwenModelManager)
                     .environmentObject(fluidAudioModelManager)
                     .environmentObject(transcriptionModelManager)
                     .environmentObject(recorderUIManager)
@@ -312,6 +322,7 @@ struct VoiceInkApp: App {
                     .environmentObject(hotkeyManager)
                     .environmentObject(engine)
                     .environmentObject(whisperModelManager)
+                    .environmentObject(qwenModelManager)
                     .environmentObject(fluidAudioModelManager)
                     .environmentObject(transcriptionModelManager)
                     .environmentObject(recorderUIManager)
@@ -340,6 +351,7 @@ struct VoiceInkApp: App {
             MenuBarView()
                 .environmentObject(engine)
                 .environmentObject(whisperModelManager)
+                .environmentObject(qwenModelManager)
                 .environmentObject(fluidAudioModelManager)
                 .environmentObject(transcriptionModelManager)
                 .environmentObject(recorderUIManager)

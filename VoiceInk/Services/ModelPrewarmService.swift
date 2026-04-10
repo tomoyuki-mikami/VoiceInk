@@ -7,19 +7,22 @@ import AppKit
 final class ModelPrewarmService: ObservableObject {
     private let transcriptionModelManager: TranscriptionModelManager
     private let whisperModelManager: WhisperModelManager
+    private let qwenModelManager: QwenModelManager
     private let modelContext: ModelContext
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "ModelPrewarm")
     private lazy var serviceRegistry = TranscriptionServiceRegistry(
         modelProvider: whisperModelManager,
+        qwenModelProvider: qwenModelManager,
         modelsDirectory: whisperModelManager.modelsDirectory,
         modelContext: modelContext
     )
     private let prewarmAudioURL = Bundle.main.url(forResource: "esc", withExtension: "wav")
     private let prewarmEnabledKey = "PrewarmModelOnWake"
 
-    init(transcriptionModelManager: TranscriptionModelManager, whisperModelManager: WhisperModelManager, modelContext: ModelContext) {
+    init(transcriptionModelManager: TranscriptionModelManager, whisperModelManager: WhisperModelManager, qwenModelManager: QwenModelManager, modelContext: ModelContext) {
         self.transcriptionModelManager = transcriptionModelManager
         self.whisperModelManager = whisperModelManager
+        self.qwenModelManager = qwenModelManager
         self.modelContext = modelContext
         setupNotifications()
         schedulePrewarmOnAppLaunch()
@@ -106,7 +109,7 @@ final class ModelPrewarmService: ObservableObject {
         }
 
         switch model.provider {
-        case .local, .fluidAudio:
+        case .local, .qwen3, .fluidAudio:
             return true
         default:
             logger.notice("Skipping prewarm - cloud models don't need it")

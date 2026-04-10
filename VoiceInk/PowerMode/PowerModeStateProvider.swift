@@ -9,6 +9,8 @@ protocol PowerModeStateProvider: AnyObject {
     func setDefaultTranscriptionModel(_ model: any TranscriptionModel)
     func cleanupModelResources() async
     func loadModel(_ model: WhisperModel) async throws
+    func loadQwenModel(_ model: QwenLocalModel) async throws
 
     var availableModels: [WhisperModel] { get }
+    var availableQwenModels: [QwenLocalModel] { get }
 }

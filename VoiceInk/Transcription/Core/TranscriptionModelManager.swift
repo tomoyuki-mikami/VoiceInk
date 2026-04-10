@@ -8,16 +8,21 @@ class TranscriptionModelManager: ObservableObject {
     @Published var allAvailableModels: [any TranscriptionModel] = PredefinedModels.models
 
     private weak var whisperModelManager: WhisperModelManager?
+    private weak var qwenModelManager: QwenModelManager?
     private weak var fluidAudioModelManager: FluidAudioModelManager?
 
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionModelManager")
 
-    init(whisperModelManager: WhisperModelManager, fluidAudioModelManager: FluidAudioModelManager) {
+    init(whisperModelManager: WhisperModelManager, qwenModelManager: QwenModelManager, fluidAudioModelManager: FluidAudioModelManager) {
         self.whisperModelManager = whisperModelManager
+        self.qwenModelManager = qwenModelManager
         self.fluidAudioModelManager = fluidAudioModelManager
 
         // Wire up deletion callbacks so each manager notifies this manager.
         whisperModelManager.onModelDeleted = { [weak self] modelName in
+            self?.handleModelDeleted(modelName)
+        }
+        qwenModelManager.onModelDeleted = { [weak self] modelName in
             self?.handleModelDeleted(modelName)
         }
         fluidAudioModelManager.onModelDeleted = { [weak self] modelName in
@@ -26,6 +31,9 @@ class TranscriptionModelManager: ObservableObject {
 
         // Wire up "models changed" callbacks so this manager rebuilds allAvailableModels.
         whisperModelManager.onModelsChanged = { [weak self] in
+            self?.refreshAllAvailableModels()
+        }
+        qwenModelManager.onModelsChanged = { [weak self] in
             self?.refreshAllAvailableModels()
         }
         fluidAudioModelManager.onModelsChanged = { [weak self] in
@@ -40,6 +48,8 @@ class TranscriptionModelManager: ObservableObject {
             switch model.provider {
             case .local:
                 return whisperModelManager?.availableModels.contains { $0.name == model.name } ?? false
+            case .qwen3:
+                return qwenModelManager?.isModelDownloaded(named: model.name) ?? false
             case .fluidAudio:
                 return fluidAudioModelManager?.isFluidAudioModelDownloaded(named: model.name) ?? false
             case .nativeApple:
@@ -87,6 +97,9 @@ class TranscriptionModelManager: ObservableObject {
             whisperModelManager?.loadedLocalModel = nil
             whisperModelManager?.isModelLoaded = true
         }
+        if model.provider != .qwen3 {
+            qwenModelManager?.unloadModel()
+        }
 
         NotificationCenter.default.post(name: .didChangeModel, object: nil, userInfo: ["modelName": model.name])
         NotificationCenter.default.post(name: .AppSettingsDidChange, object: nil)
@@ -103,6 +116,10 @@ class TranscriptionModelManager: ObservableObject {
                 let importedModel = ImportedLocalModel(fileBaseName: whisperModel.name)
                 models.append(importedModel)
             }
+        }
+
+        for qwenModel in qwenModelManager?.availableModels ?? [] where !models.contains(where: { $0.name == qwenModel.name }) {
+            models.append(qwenModel)
         }
 
         allAvailableModels = models
@@ -129,6 +146,7 @@ class TranscriptionModelManager: ObservableObject {
             UserDefaults.standard.removeObject(forKey: "CurrentTranscriptionModel")
             whisperModelManager?.loadedLocalModel = nil
             whisperModelManager?.isModelLoaded = false
+            qwenModelManager?.unloadModel()
             UserDefaults.standard.removeObject(forKey: "CurrentModel")
         }
         refreshAllAvailableModels()

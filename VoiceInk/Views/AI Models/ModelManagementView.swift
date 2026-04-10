@@ -13,6 +13,7 @@ enum ModelFilter: String, CaseIterable, Identifiable {
 
 struct ModelManagementView: View {
     @EnvironmentObject private var whisperModelManager: WhisperModelManager
+    @EnvironmentObject private var qwenModelManager: QwenModelManager
     @EnvironmentObject private var fluidAudioModelManager: FluidAudioModelManager
     @EnvironmentObject private var transcriptionModelManager: TranscriptionModelManager
     @State private var customModelToEdit: CustomCloudModel?
@@ -175,9 +176,9 @@ struct ModelManagementView: View {
                             model: model,
                             fluidAudioModelManager: fluidAudioModelManager,
                             transcriptionModelManager: transcriptionModelManager,
-                            isDownloaded: whisperModelManager.availableModels.contains { $0.name == model.name },
+                            isDownloaded: isModelDownloaded(model),
                             isCurrent: transcriptionModelManager.currentTranscriptionModel?.name == model.name,
-                            downloadProgress: whisperModelManager.downloadProgress,
+                            downloadProgress: downloadProgress(for: model),
                             modelURL: whisperModelManager.availableModels.first { $0.name == model.name }?.url,
                             isWarming: isWarming,
                             deleteAction: {
@@ -198,6 +199,15 @@ struct ModelManagementView: View {
                                         }
                                     }
                                     isShowingDeleteAlert = true
+                                } else if let qwenModel = model as? QwenLocalModel, qwenModelManager.isModelDownloaded(named: qwenModel.name) {
+                                    alertTitle = "Delete Model"
+                                    alertMessage = "Are you sure you want to delete the model '\(qwenModel.displayName)'?"
+                                    deleteActionClosure = {
+                                        Task {
+                                            await qwenModelManager.deleteModel(qwenModel)
+                                        }
+                                    }
+                                    isShowingDeleteAlert = true
                                 }
                             },
                             setDefaultAction: {
@@ -208,6 +218,8 @@ struct ModelManagementView: View {
                             downloadAction: {
                                 if let localModel = model as? LocalModel {
                                     Task { await whisperModelManager.downloadModel(localModel) }
+                                } else if let qwenModel = model as? QwenLocalModel {
+                                    Task { await qwenModelManager.downloadModel(qwenModel) }
                                 }
                             },
                             editAction: model.provider == .custom ? { customModel in
@@ -316,13 +328,31 @@ struct ModelManagementView: View {
                 return index1 < index2
             }
         case .local:
-            return transcriptionModelManager.allAvailableModels.filter { $0.provider == .local || $0.provider == .nativeApple || $0.provider == .fluidAudio }
+            return transcriptionModelManager.allAvailableModels.filter { $0.provider == .local || $0.provider == .qwen3 || $0.provider == .nativeApple || $0.provider == .fluidAudio }
         case .cloud:
             let cloudProviders: [ModelProvider] = [.groq, .elevenLabs, .deepgram, .mistral, .gemini, .soniox, .speechmatics]
             return transcriptionModelManager.allAvailableModels.filter { cloudProviders.contains($0.provider) }
         case .custom:
             return transcriptionModelManager.allAvailableModels.filter { $0.provider == .custom }
         }
+    }
+
+    private func isModelDownloaded(_ model: any TranscriptionModel) -> Bool {
+        switch model.provider {
+        case .local:
+            return whisperModelManager.availableModels.contains { $0.name == model.name }
+        case .qwen3:
+            return qwenModelManager.isModelDownloaded(named: model.name)
+        default:
+            return false
+        }
+    }
+
+    private func downloadProgress(for model: any TranscriptionModel) -> [String: Double] {
+        if model.provider == .qwen3 {
+            return Dictionary(uniqueKeysWithValues: qwenModelManager.downloadInProgress.map { ($0, 0.0) })
+        }
+        return whisperModelManager.downloadProgress
     }
 
     // MARK: - Import Panel

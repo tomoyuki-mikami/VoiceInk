@@ -193,6 +193,15 @@ class PowerModeSessionManager {
                     print("Power Mode: Failed to load local model '\(localModel.name)': \(error)")
                 }
             }
+        case .qwen3:
+            await stateProvider.cleanupModelResources()
+            if let qwenModel = await stateProvider.availableQwenModels.first(where: { $0.name == newModel.name }) {
+                do {
+                    try await stateProvider.loadQwenModel(qwenModel)
+                } catch {
+                    print("Power Mode: Failed to load Qwen model '\(qwenModel.name)': \(error)")
+                }
+            }
         case .fluidAudio:
             await stateProvider.cleanupModelResources()
         default:

@@ -6,6 +6,7 @@ import os
 @MainActor
 class TranscriptionServiceRegistry {
     private weak var modelProvider: (any LocalModelProvider)?
+    private weak var qwenModelProvider: (any QwenModelProvider)?
     private let modelsDirectory: URL
     private let modelContext: ModelContext
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionServiceRegistry")
@@ -14,12 +15,14 @@ class TranscriptionServiceRegistry {
         modelsDirectory: modelsDirectory,
         modelProvider: modelProvider
     )
+    private(set) lazy var qwenTranscriptionService = QwenTranscriptionService(modelProvider: qwenModelProvider)
     private(set) lazy var cloudTranscriptionService = CloudTranscriptionService(modelContext: modelContext)
     private(set) lazy var nativeAppleTranscriptionService = NativeAppleTranscriptionService()
     private(set) lazy var fluidAudioTranscriptionService = FluidAudioTranscriptionService()
 
-    init(modelProvider: any LocalModelProvider, modelsDirectory: URL, modelContext: ModelContext) {
+    init(modelProvider: any LocalModelProvider, qwenModelProvider: any QwenModelProvider, modelsDirectory: URL, modelContext: ModelContext) {
         self.modelProvider = modelProvider
+        self.qwenModelProvider = qwenModelProvider
         self.modelsDirectory = modelsDirectory
         self.modelContext = modelContext
     }
@@ -28,6 +31,8 @@ class TranscriptionServiceRegistry {
         switch provider {
         case .local:
             return localTranscriptionService
+        case .qwen3:
+            return qwenTranscriptionService
         case .fluidAudio:
             return fluidAudioTranscriptionService
         case .nativeApple:

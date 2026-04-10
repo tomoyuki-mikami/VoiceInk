@@ -3,6 +3,7 @@ import Foundation
 // Enum to differentiate between model providers
 enum ModelProvider: String, Codable, Hashable, CaseIterable {
     case local = "Local"
+    case qwen3 = "Qwen3 ASR"
     case fluidAudio = "Parakeet"
     case groq = "Groq"
     case elevenLabs = "ElevenLabs"
@@ -180,6 +181,51 @@ struct LocalModel: TranscriptionModel {
         supportedLanguages.count > 1
     }
 } 
+
+struct QwenLocalModel: TranscriptionModel {
+    static let languageNames: [String: String] = [
+        "zh": "Chinese", "en": "English", "yue": "Cantonese",
+        "ar": "Arabic", "de": "German", "fr": "French",
+        "es": "Spanish", "pt": "Portuguese", "id": "Indonesian",
+        "it": "Italian", "ko": "Korean", "ru": "Russian",
+        "th": "Thai", "vi": "Vietnamese", "ja": "Japanese",
+        "tr": "Turkish", "hi": "Hindi", "ms": "Malay",
+        "nl": "Dutch", "sv": "Swedish", "da": "Danish",
+        "fi": "Finnish", "pl": "Polish", "cs": "Czech",
+        "fa": "Persian", "el": "Greek", "hu": "Hungarian",
+        "mk": "Macedonian", "ro": "Romanian"
+    ]
+
+    let id = UUID()
+    let name: String
+    let displayName: String
+    let repoId: String
+    let size: String
+    let ramRequirement: String
+    let supportedLanguages: [String: String]
+    let description: String
+    let speed: Double
+    let accuracy: Double
+    let ramUsage: Double
+    let provider: ModelProvider = .qwen3
+
+    var isMultilingualModel: Bool {
+        supportedLanguages.count > 1
+    }
+
+    var storageDirectory: URL {
+        let appSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.prakashjoshipax.VoiceInk")
+            .appendingPathComponent("QwenModels")
+        return appSupportDirectory
+            .appendingPathComponent("mlx-audio")
+            .appendingPathComponent(repoId.replacingOccurrences(of: "/", with: "_"))
+    }
+
+    var isDownloaded: Bool {
+        FileManager.default.fileExists(atPath: storageDirectory.path)
+    }
+}
 
 // User-imported local models 
 struct ImportedLocalModel: TranscriptionModel {
