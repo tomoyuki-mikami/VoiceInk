@@ -191,6 +191,16 @@ import Foundation
             ramUsage: 0.8,
             supportedLanguages: getLanguageDictionary(isMultilingual: true, provider: .fluidAudio)
         ),
+        FluidAudioModel(
+            name: "parakeet-tdt_ctc-0.6b-ja",
+            displayName: "Parakeet Japanese",
+            description: "NVIDIA の日本語向け Parakeet モデル。VoiceInk では安定した日本語 CTC 経路で動作します。",
+            size: "494 MB",
+            speed: 0.9,
+            accuracy: 0.95,
+            ramUsage: 0.8,
+            supportedLanguages: ["ja": "Japanese"]
+        ),
 
          // Local Models
          LocalModel(

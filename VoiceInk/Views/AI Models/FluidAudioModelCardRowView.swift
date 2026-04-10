@@ -3,6 +3,8 @@ import Combine
 import AppKit
 
 struct FluidAudioModelCardRowView: View {
+    private static let japaneseParakeetModelName = "parakeet-tdt_ctc-0.6b-ja"
+
     let model: FluidAudioModel
     @ObservedObject var fluidAudioModelManager: FluidAudioModelManager
     @ObservedObject var transcriptionModelManager: TranscriptionModelManager
@@ -18,6 +20,10 @@ struct FluidAudioModelCardRowView: View {
 
     var isDownloading: Bool {
         fluidAudioModelManager.isFluidAudioModelDownloading(model)
+    }
+
+    var shouldShowBenchmarks: Bool {
+        model.name != Self.japaneseParakeetModelName
     }
 
     var body: some View {
@@ -71,16 +77,18 @@ struct FluidAudioModelCardRowView: View {
         HStack(spacing: 12) {
             Label(model.language, systemImage: "globe")
             Label(model.size, systemImage: "internaldrive")
-            HStack(spacing: 3) {
-                Text("Speed")
-                progressDotsWithNumber(value: model.speed * 10)
+            if shouldShowBenchmarks {
+                HStack(spacing: 3) {
+                    Text("Speed")
+                    progressDotsWithNumber(value: model.speed * 10)
+                }
+                .fixedSize(horizontal: true, vertical: false)
+                HStack(spacing: 3) {
+                    Text("Accuracy")
+                    progressDotsWithNumber(value: model.accuracy * 10)
+                }
+                .fixedSize(horizontal: true, vertical: false)
             }
-            .fixedSize(horizontal: true, vertical: false)
-            HStack(spacing: 3) {
-                Text("Accuracy")
-                progressDotsWithNumber(value: model.accuracy * 10)
-            }
-            .fixedSize(horizontal: true, vertical: false)
         }
         .font(.system(size: 11))
         .foregroundColor(Color(.secondaryLabelColor))

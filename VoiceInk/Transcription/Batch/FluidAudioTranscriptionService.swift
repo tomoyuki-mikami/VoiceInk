@@ -5,7 +5,12 @@ import FluidAudio
 import os.log
 
 class FluidAudioTranscriptionService: TranscriptionService {
+    private static let japaneseParakeetModelName = "parakeet-tdt_ctc-0.6b-ja"
+    private static let japaneseChunkSamples = 192_000
+    private static let japaneseChunkOverlapSamples = 32_000
+
     private var asrManager: AsrManager?
+    private var ctcJaManager: CtcJaManager?
     private var vadManager: VadManager?
     private var activeVersion: AsrModelVersion?
     private var cachedModels: AsrModels?
@@ -33,6 +38,14 @@ class FluidAudioTranscriptionService: TranscriptionService {
         try await manager.loadModels(models)
         self.asrManager = manager
         self.activeVersion = version
+    }
+
+    private func ensureJapaneseModelsLoaded() async throws {
+        if ctcJaManager != nil {
+            return
+        }
+
+        ctcJaManager = try await CtcJaManager.load()
     }
 
     // Returns cached models or loads from disk; deduplicates concurrent loads
@@ -72,10 +85,25 @@ class FluidAudioTranscriptionService: TranscriptionService {
     }
 
     func loadModel(for model: FluidAudioModel) async throws {
-        try await ensureModelsLoaded(for: version(for: model))
+        if model.name == Self.japaneseParakeetModelName {
+            try await ensureJapaneseModelsLoaded()
+        } else {
+            try await ensureModelsLoaded(for: version(for: model))
+        }
     }
 
     func transcribe(audioURL: URL, model: any TranscriptionModel) async throws -> String {
+        if model.name == Self.japaneseParakeetModelName {
+            try await ensureJapaneseModelsLoaded()
+            guard let ctcJaManager else {
+                throw ASRError.notInitialized
+            }
+
+            let audioSamples = try readAudioSamples(from: audioURL)
+            let text = try await transcribeJapaneseAudio(audioSamples, using: ctcJaManager)
+            return TextNormalizer.shared.normalizeSentence(text)
+        }
+
         let targetVersion = version(for: model)
         try await ensureModelsLoaded(for: targetVersion)
 
@@ -144,12 +172,81 @@ class FluidAudioTranscriptionService: TranscriptionService {
         }
     }
 
+    private func transcribeJapaneseAudio(_ audioSamples: [Float], using manager: CtcJaManager) async throws -> String {
+        if audioSamples.count <= Self.japaneseChunkSamples {
+            return try await manager.transcribe(audio: audioSamples)
+        }
+
+        let chunkSize = Self.japaneseChunkSamples
+        let overlap = Self.japaneseChunkOverlapSamples
+        let step = max(chunkSize - overlap, 1)
+
+        var chunkTexts: [String] = []
+        var startIndex = 0
+
+        while startIndex < audioSamples.count {
+            let endIndex = min(startIndex + chunkSize, audioSamples.count)
+            let chunk = Array(audioSamples[startIndex..<endIndex])
+            let text = try await manager.transcribe(audio: chunk)
+
+            if !text.isEmpty {
+                chunkTexts.append(text)
+            }
+
+            if endIndex == audioSamples.count {
+                break
+            }
+            startIndex += step
+        }
+
+        guard var mergedText = chunkTexts.first else {
+            return ""
+        }
+
+        for chunkText in chunkTexts.dropFirst() {
+            mergedText = mergeJapaneseChunkText(current: mergedText, next: chunkText)
+        }
+
+        return mergedText
+    }
+
+    private func mergeJapaneseChunkText(current: String, next: String) -> String {
+        let trimmedCurrent = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNext = next.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedCurrent.isEmpty else { return trimmedNext }
+        guard !trimmedNext.isEmpty else { return trimmedCurrent }
+
+        let currentChars = Array(trimmedCurrent)
+        let nextChars = Array(trimmedNext)
+        let maxOverlap = min(40, currentChars.count, nextChars.count)
+
+        var bestOverlap = 0
+        if maxOverlap > 0 {
+            for overlapLength in stride(from: maxOverlap, through: 1, by: -1) {
+                let currentSuffix = String(currentChars.suffix(overlapLength))
+                let nextPrefix = String(nextChars.prefix(overlapLength))
+                if currentSuffix == nextPrefix {
+                    bestOverlap = overlapLength
+                    break
+                }
+            }
+        }
+
+        if bestOverlap > 0 {
+            return trimmedCurrent + String(nextChars.dropFirst(bestOverlap))
+        }
+
+        return trimmedCurrent + " " + trimmedNext
+    }
+
     // Releases ASR/VAD resources but preserves cached models for reuse
     func cleanup() async {
         if let manager = asrManager {
             await manager.cleanup()
         }
         asrManager = nil
+        ctcJaManager = nil
         vadManager = nil
         activeVersion = nil
     }
