@@ -162,7 +162,7 @@ final class AddonLocalModelCatalog: ObservableObject {
         }
     }
 
-    func cardView(
+    private func addonCardView(
         for model: any AddonLocalModel,
         isDownloaded: Bool,
         isCurrent: Bool,
@@ -214,7 +214,7 @@ final class AddonLocalModelCatalog: ObservableObject {
             return nil
         }
 
-        return cardView(
+        return addonCardView(
             for: addonModel,
             isDownloaded: isDownloaded,
             isCurrent: isCurrent,
