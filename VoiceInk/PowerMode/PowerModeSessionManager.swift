@@ -193,13 +193,13 @@ class PowerModeSessionManager {
                     print("Power Mode: Failed to load local model '\(localModel.name)': \(error)")
                 }
             }
-        case .qwen3:
+        case .localAddon:
             await stateProvider.cleanupModelResources()
-            if let qwenModel = await stateProvider.availableQwenModels.first(where: { $0.name == newModel.name }) {
+            if let addonModel = await stateProvider.availableAddonModels.first(where: { $0.name == newModel.name }) {
                 do {
-                    try await stateProvider.loadQwenModel(qwenModel)
+                    try await stateProvider.loadAddonModel(addonModel)
                 } catch {
-                    print("Power Mode: Failed to load Qwen model '\(qwenModel.name)': \(error)")
+                    print("Power Mode: Failed to load add-on model '\(addonModel.name)': \(error)")
                 }
             }
         case .fluidAudio:

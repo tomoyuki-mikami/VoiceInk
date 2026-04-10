@@ -27,7 +27,7 @@ class AudioTranscriptionService: ObservableObject {
         self.enhancementService = engine.enhancementService
         self.serviceRegistry = TranscriptionServiceRegistry(
             modelProvider: engine.whisperModelManager,
-            qwenModelProvider: engine.qwenModelManager,
+            addonLocalModelCatalog: engine.addonLocalModelCatalog,
             modelsDirectory: engine.whisperModelManager.modelsDirectory,
             modelContext: modelContext
         )

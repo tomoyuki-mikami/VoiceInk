@@ -38,10 +38,6 @@ import Foundation
                 filtered["auto"] = "Auto-detect"
                 return filtered
             }
-            if provider == .qwen3 {
-                let qwenSupportedCodes = Array(QwenLocalModel.languageNames.keys) + ["auto"]
-                return allLanguages.filter { qwenSupportedCodes.contains($0.key) }
-            }
             return allLanguages
         }
     }
@@ -106,59 +102,8 @@ import Foundation
     ]
     
     static var models: [any TranscriptionModel] {
-        return predefinedModels + qwenModels + CustomModelManager.shared.customModels
+        return predefinedModels + CustomModelManager.shared.customModels
     }
-
-    static let qwenModels: [QwenLocalModel] = [
-        QwenLocalModel(
-            name: "qwen3-asr-0.6b-4bit",
-            displayName: "Qwen3 0.6B (4-bit)",
-            repoId: "mlx-community/Qwen3-ASR-0.6B-4bit",
-            size: "~400 MB",
-            ramRequirement: "8 GB+ RAM",
-            supportedLanguages: getLanguageDictionary(isMultilingual: true, provider: .qwen3),
-            description: "Qwen3-ASR の軽量モデル。Apple Silicon でのローカル文字起こし向け。",
-            speed: 0.88,
-            accuracy: 0.9,
-            ramUsage: 1.0
-        ),
-        QwenLocalModel(
-            name: "qwen3-asr-0.6b-8bit",
-            displayName: "Qwen3 0.6B (8-bit)",
-            repoId: "mlx-community/Qwen3-ASR-0.6B-8bit",
-            size: "~800 MB",
-            ramRequirement: "16 GB+ RAM",
-            supportedLanguages: getLanguageDictionary(isMultilingual: true, provider: .qwen3),
-            description: "Qwen3-ASR の軽量高精度版。速度と精度のバランス向け。",
-            speed: 0.82,
-            accuracy: 0.92,
-            ramUsage: 1.6
-        ),
-        QwenLocalModel(
-            name: "qwen3-asr-1.7b-4bit",
-            displayName: "Qwen3 1.7B (4-bit)",
-            repoId: "mlx-community/Qwen3-ASR-1.7B-4bit",
-            size: "~1 GB",
-            ramRequirement: "16 GB+ RAM",
-            supportedLanguages: getLanguageDictionary(isMultilingual: true, provider: .qwen3),
-            description: "Qwen3-ASR の中量モデル。多言語精度を重視したいとき向け。",
-            speed: 0.7,
-            accuracy: 0.95,
-            ramUsage: 2.4
-        ),
-        QwenLocalModel(
-            name: "qwen3-asr-1.7b-8bit",
-            displayName: "Qwen3 1.7B (8-bit)",
-            repoId: "mlx-community/Qwen3-ASR-1.7B-8bit",
-            size: "~2 GB",
-            ramRequirement: "32 GB+ RAM",
-            supportedLanguages: getLanguageDictionary(isMultilingual: true, provider: .qwen3),
-            description: "Qwen3-ASR の高精度モデル。メモリに余裕がある環境向け。",
-            speed: 0.58,
-            accuracy: 0.97,
-            ramUsage: 4.0
-        )
-    ]
     
     private static let predefinedModels: [any TranscriptionModel] = [
         // Native Apple Model
@@ -191,17 +136,6 @@ import Foundation
             ramUsage: 0.8,
             supportedLanguages: getLanguageDictionary(isMultilingual: true, provider: .fluidAudio)
         ),
-        FluidAudioModel(
-            name: "parakeet-tdt_ctc-0.6b-ja",
-            displayName: "Parakeet Japanese",
-            description: "NVIDIA の日本語向け Parakeet モデル。VoiceInk では安定した日本語 CTC 経路で動作します。",
-            size: "494 MB",
-            speed: 0.9,
-            accuracy: 0.95,
-            ramUsage: 0.8,
-            supportedLanguages: ["ja": "Japanese"]
-        ),
-
          // Local Models
          LocalModel(
              name: "ggml-tiny",

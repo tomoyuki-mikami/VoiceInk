@@ -8,21 +8,21 @@ class TranscriptionModelManager: ObservableObject {
     @Published var allAvailableModels: [any TranscriptionModel] = PredefinedModels.models
 
     private weak var whisperModelManager: WhisperModelManager?
-    private weak var qwenModelManager: QwenModelManager?
+    private weak var addonLocalModelCatalog: AddonLocalModelCatalog?
     private weak var fluidAudioModelManager: FluidAudioModelManager?
 
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionModelManager")
 
-    init(whisperModelManager: WhisperModelManager, qwenModelManager: QwenModelManager, fluidAudioModelManager: FluidAudioModelManager) {
+    init(whisperModelManager: WhisperModelManager, addonLocalModelCatalog: AddonLocalModelCatalog, fluidAudioModelManager: FluidAudioModelManager) {
         self.whisperModelManager = whisperModelManager
-        self.qwenModelManager = qwenModelManager
+        self.addonLocalModelCatalog = addonLocalModelCatalog
         self.fluidAudioModelManager = fluidAudioModelManager
 
         // Wire up deletion callbacks so each manager notifies this manager.
         whisperModelManager.onModelDeleted = { [weak self] modelName in
             self?.handleModelDeleted(modelName)
         }
-        qwenModelManager.onModelDeleted = { [weak self] modelName in
+        addonLocalModelCatalog.onModelDeleted = { [weak self] modelName in
             self?.handleModelDeleted(modelName)
         }
         fluidAudioModelManager.onModelDeleted = { [weak self] modelName in
@@ -33,7 +33,7 @@ class TranscriptionModelManager: ObservableObject {
         whisperModelManager.onModelsChanged = { [weak self] in
             self?.refreshAllAvailableModels()
         }
-        qwenModelManager.onModelsChanged = { [weak self] in
+        addonLocalModelCatalog.onModelsChanged = { [weak self] in
             self?.refreshAllAvailableModels()
         }
         fluidAudioModelManager.onModelsChanged = { [weak self] in
@@ -45,11 +45,15 @@ class TranscriptionModelManager: ObservableObject {
 
     var usableModels: [any TranscriptionModel] {
         allAvailableModels.filter { model in
+            if addonLocalModelCatalog?.includes(model) == true {
+                return addonLocalModelCatalog?.isModelDownloaded(model) ?? false
+            }
+
             switch model.provider {
             case .local:
                 return whisperModelManager?.availableModels.contains { $0.name == model.name } ?? false
-            case .qwen3:
-                return qwenModelManager?.isModelDownloaded(named: model.name) ?? false
+            case .localAddon:
+                return false
             case .fluidAudio:
                 return fluidAudioModelManager?.isFluidAudioModelDownloaded(named: model.name) ?? false
             case .nativeApple:
@@ -97,8 +101,8 @@ class TranscriptionModelManager: ObservableObject {
             whisperModelManager?.loadedLocalModel = nil
             whisperModelManager?.isModelLoaded = true
         }
-        if model.provider != .qwen3 {
-            qwenModelManager?.unloadModel()
+        if addonLocalModelCatalog?.includes(model) != true {
+            addonLocalModelCatalog?.unloadModelResources()
         }
 
         NotificationCenter.default.post(name: .didChangeModel, object: nil, userInfo: ["modelName": model.name])
@@ -118,9 +122,7 @@ class TranscriptionModelManager: ObservableObject {
             }
         }
 
-        for qwenModel in qwenModelManager?.availableModels ?? [] where !models.contains(where: { $0.name == qwenModel.name }) {
-            models.append(qwenModel)
-        }
+        models = addonLocalModelCatalog?.merged(into: models) ?? models
 
         allAvailableModels = models
 
@@ -146,7 +148,7 @@ class TranscriptionModelManager: ObservableObject {
             UserDefaults.standard.removeObject(forKey: "CurrentTranscriptionModel")
             whisperModelManager?.loadedLocalModel = nil
             whisperModelManager?.isModelLoaded = false
-            qwenModelManager?.unloadModel()
+            addonLocalModelCatalog?.unloadModelResources()
             UserDefaults.standard.removeObject(forKey: "CurrentModel")
         }
         refreshAllAvailableModels()

@@ -18,7 +18,7 @@ class VoiceInkEngine: NSObject, ObservableObject {
 
     // Injected managers
     let whisperModelManager: WhisperModelManager
-    let qwenModelManager: QwenModelManager
+    let addonLocalModelCatalog: AddonLocalModelCatalog
     let transcriptionModelManager: TranscriptionModelManager
     weak var recorderUIManager: RecorderUIManager?
 
@@ -32,13 +32,13 @@ class VoiceInkEngine: NSObject, ObservableObject {
     init(
         modelContext: ModelContext,
         whisperModelManager: WhisperModelManager,
-        qwenModelManager: QwenModelManager,
+        addonLocalModelCatalog: AddonLocalModelCatalog,
         transcriptionModelManager: TranscriptionModelManager,
         enhancementService: AIEnhancementService? = nil
     ) {
         self.modelContext = modelContext
         self.whisperModelManager = whisperModelManager
-        self.qwenModelManager = qwenModelManager
+        self.addonLocalModelCatalog = addonLocalModelCatalog
         self.transcriptionModelManager = transcriptionModelManager
         self.enhancementService = enhancementService
 
@@ -48,7 +48,7 @@ class VoiceInkEngine: NSObject, ObservableObject {
 
         self.serviceRegistry = TranscriptionServiceRegistry(
             modelProvider: whisperModelManager,
-            qwenModelProvider: qwenModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog,
             modelsDirectory: whisperModelManager.modelsDirectory,
             modelContext: modelContext
         )
@@ -195,11 +195,11 @@ class VoiceInkEngine: NSObject, ObservableObject {
                                             await self.logger.error("❌ Model loading failed: \(error.localizedDescription, privacy: .public)")
                                         }
                                     }
-                                } else if let qwenModel = await self.transcriptionModelManager.currentTranscriptionModel as? QwenLocalModel {
+                                } else if let addonModel = (await self.transcriptionModelManager.currentTranscriptionModel) as? any AddonLocalModel {
                                     do {
-                                        try await self.qwenModelManager.loadModel(qwenModel)
+                                        try await self.addonLocalModelCatalog.prepareModel(addonModel)
                                     } catch {
-                                        await self.logger.error("❌ Qwen model loading failed: \(error.localizedDescription, privacy: .public)")
+                                        await self.logger.error("❌ Add-on model loading failed: \(error.localizedDescription, privacy: .public)")
                                     }
                                 } else if let fluidAudioModel = await self.transcriptionModelManager.currentTranscriptionModel as? FluidAudioModel {
                                     try? await self.serviceRegistry.fluidAudioTranscriptionService.loadModel(for: fluidAudioModel)
@@ -268,7 +268,6 @@ class VoiceInkEngine: NSObject, ObservableObject {
     func cleanupResources() async {
         logger.notice("cleanupResources: releasing model resources")
         await whisperModelManager.cleanupResources()
-        await qwenModelManager.cleanupResources()
         await serviceRegistry.cleanup()
         logger.notice("cleanupResources: completed")
     }

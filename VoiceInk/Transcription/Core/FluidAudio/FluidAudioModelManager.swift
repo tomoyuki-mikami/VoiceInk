@@ -5,8 +5,6 @@ import os
 
 @MainActor
 class FluidAudioModelManager: ObservableObject {
-    private static let japaneseParakeetModelName = "parakeet-tdt_ctc-0.6b-ja"
-
     @Published var parakeetDownloadStates: [String: Bool] = [:]
     @Published var downloadProgress: [String: Double] = [:]
 
@@ -63,11 +61,7 @@ class FluidAudioModelManager: ObservableObject {
         let version = FluidAudioModelManager.asrVersion(for: modelName)
 
         do {
-            if modelName == Self.japaneseParakeetModelName {
-                _ = try await CtcJaModels.downloadAndLoad()
-            } else {
-                _ = try await AsrModels.downloadAndLoad(version: version)
-            }
+            _ = try await AsrModels.downloadAndLoad(version: version)
             _ = try await VadManager()
 
             UserDefaults.standard.set(true, forKey: parakeetDefaultsKey(for: modelName))
@@ -87,13 +81,8 @@ class FluidAudioModelManager: ObservableObject {
     // MARK: - Delete
 
     func deleteFluidAudioModel(_ model: FluidAudioModel) {
-        let cacheDirectory: URL
-        if model.name == Self.japaneseParakeetModelName {
-            cacheDirectory = CtcJaModels.defaultCacheDirectory()
-        } else {
-            let version = FluidAudioModelManager.asrVersion(for: model.name)
-            cacheDirectory = parakeetCacheDirectory(for: version)
-        }
+        let version = FluidAudioModelManager.asrVersion(for: model.name)
+        let cacheDirectory = parakeetCacheDirectory(for: version)
 
         do {
             if FileManager.default.fileExists(atPath: cacheDirectory.path) {
@@ -111,12 +100,7 @@ class FluidAudioModelManager: ObservableObject {
     // MARK: - Finder
 
     func showFluidAudioModelInFinder(_ model: FluidAudioModel) {
-        let cacheDirectory: URL
-        if model.name == Self.japaneseParakeetModelName {
-            cacheDirectory = CtcJaModels.defaultCacheDirectory()
-        } else {
-            cacheDirectory = parakeetCacheDirectory(for: FluidAudioModelManager.asrVersion(for: model.name))
-        }
+        let cacheDirectory = parakeetCacheDirectory(for: FluidAudioModelManager.asrVersion(for: model.name))
 
         if FileManager.default.fileExists(atPath: cacheDirectory.path) {
             NSWorkspace.shared.selectFile(cacheDirectory.path, inFileViewerRootedAtPath: "")

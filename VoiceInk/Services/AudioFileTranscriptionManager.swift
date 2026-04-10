@@ -115,7 +115,7 @@ class AudioTranscriptionManager: ObservableObject {
     private func processItem(_ item: AudioFileQueueItem, modelContext: ModelContext, engine: VoiceInkEngine) async {
         let serviceRegistry = TranscriptionServiceRegistry(
             modelProvider: engine.whisperModelManager,
-            qwenModelProvider: engine.qwenModelManager,
+            addonLocalModelCatalog: engine.addonLocalModelCatalog,
             modelsDirectory: engine.whisperModelManager.modelsDirectory,
             modelContext: modelContext
         )

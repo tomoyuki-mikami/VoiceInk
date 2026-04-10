@@ -5,7 +5,7 @@ import MLXAudioSTT
 
 @MainActor
 final class QwenModelManager: ObservableObject {
-    @Published var availableModels: [QwenLocalModel] = PredefinedModels.qwenModels
+    @Published var availableModels: [QwenLocalModel] = AddonLocalModels.qwenModels
     @Published var downloadInProgress: Set<String> = []
     @Published var isModelLoaded = false
     @Published var loadedLocalModel: QwenLocalModel?
@@ -31,12 +31,12 @@ final class QwenModelManager: ObservableObject {
     }
 
     func refreshAvailableModels() {
-        availableModels = PredefinedModels.qwenModels
+        availableModels = AddonLocalModels.qwenModels
         onModelsChanged?()
     }
 
     func isModelDownloaded(named name: String) -> Bool {
-        guard let model = PredefinedModels.qwenModels.first(where: { $0.name == name }) else {
+        guard let model = AddonLocalModels.qwenModels.first(where: { $0.name == name }) else {
             return false
         }
         return FileManager.default.fileExists(atPath: model.storageDirectory.path)

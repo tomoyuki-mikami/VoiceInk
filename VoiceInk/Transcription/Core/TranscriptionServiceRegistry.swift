@@ -6,7 +6,7 @@ import os
 @MainActor
 class TranscriptionServiceRegistry {
     private weak var modelProvider: (any LocalModelProvider)?
-    private weak var qwenModelProvider: (any QwenModelProvider)?
+    private weak var addonLocalModelCatalog: AddonLocalModelCatalog?
     private let modelsDirectory: URL
     private let modelContext: ModelContext
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionServiceRegistry")
@@ -15,14 +15,13 @@ class TranscriptionServiceRegistry {
         modelsDirectory: modelsDirectory,
         modelProvider: modelProvider
     )
-    private(set) lazy var qwenTranscriptionService = QwenTranscriptionService(modelProvider: qwenModelProvider)
     private(set) lazy var cloudTranscriptionService = CloudTranscriptionService(modelContext: modelContext)
     private(set) lazy var nativeAppleTranscriptionService = NativeAppleTranscriptionService()
     private(set) lazy var fluidAudioTranscriptionService = FluidAudioTranscriptionService()
 
-    init(modelProvider: any LocalModelProvider, qwenModelProvider: any QwenModelProvider, modelsDirectory: URL, modelContext: ModelContext) {
+    init(modelProvider: any LocalModelProvider, addonLocalModelCatalog: AddonLocalModelCatalog, modelsDirectory: URL, modelContext: ModelContext) {
         self.modelProvider = modelProvider
-        self.qwenModelProvider = qwenModelProvider
+        self.addonLocalModelCatalog = addonLocalModelCatalog
         self.modelsDirectory = modelsDirectory
         self.modelContext = modelContext
     }
@@ -31,8 +30,6 @@ class TranscriptionServiceRegistry {
         switch provider {
         case .local:
             return localTranscriptionService
-        case .qwen3:
-            return qwenTranscriptionService
         case .fluidAudio:
             return fluidAudioTranscriptionService
         case .nativeApple:
@@ -44,13 +41,17 @@ class TranscriptionServiceRegistry {
 
     func transcribe(audioURL: URL, model: any TranscriptionModel) async throws -> String {
         let effectiveModel = batchFallbackModel(for: model) ?? model
-        let service = service(for: effectiveModel.provider)
+        let service = addonLocalModelCatalog?.service(for: effectiveModel) ?? service(for: effectiveModel.provider)
         logger.debug("Transcribing with \(effectiveModel.displayName, privacy: .public) using \(String(describing: type(of: service)), privacy: .public)")
         return try await service.transcribe(audioURL: audioURL, model: effectiveModel)
     }
 
     /// Creates a streaming or file-based session depending on the model's capabilities.
     func createSession(for model: any TranscriptionModel, onPartialTranscript: ((String) -> Void)? = nil) -> TranscriptionSession {
+        if let addonService = addonLocalModelCatalog?.service(for: model) {
+            return FileTranscriptionSession(service: addonService)
+        }
+
         if supportsStreaming(model: model) {
             let streamingService = StreamingTranscriptionService(
                 modelContext: modelContext,
@@ -99,5 +100,6 @@ class TranscriptionServiceRegistry {
 
     func cleanup() async {
         await fluidAudioTranscriptionService.cleanup()
+        await addonLocalModelCatalog?.cleanupResources()
     }
 }
