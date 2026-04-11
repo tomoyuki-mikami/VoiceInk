@@ -1,4 +1,5 @@
 import Foundation
+import HuggingFace
 
 protocol AddonLocalModel: TranscriptionModel {
     var addonIdentifier: String { get }
@@ -56,6 +57,18 @@ enum AddonLocalModels {
         )
     ]
 
+    static let cohereModels: [CohereLocalModel] = [
+        CohereLocalModel(
+            name: "cohere-transcribe-03-2026-mlx-fp16",
+            displayName: "Cohere Transcribe 03-2026",
+            repoId: "beshkenadze/cohere-transcribe-03-2026-mlx-fp16",
+            size: "~4 GB",
+            ramRequirement: "32 GB+ RAM",
+            supportedLanguages: CohereLocalModel.supportedLanguageDictionary(),
+            description: "Cohere Transcribe の MLX 変換版。高精度寄りですが大きめで、言語は手動選択が前提です。"
+        )
+    ]
+
     static let japaneseParakeetModels: [JapaneseParakeetLocalModel] = [
         JapaneseParakeetLocalModel(
             name: "parakeet-tdt_ctc-0.6b-ja",
@@ -71,6 +84,7 @@ enum AddonLocalModels {
 
     static var allModels: [any AddonLocalModel] {
         qwenModels.map { $0 as any AddonLocalModel } +
+        cohereModels.map { $0 as any AddonLocalModel } +
         japaneseParakeetModels.map { $0 as any AddonLocalModel }
     }
 }
@@ -117,6 +131,54 @@ struct QwenLocalModel: AddonLocalModel {
             .appendingPathComponent("com.prakashjoshipax.VoiceInk")
             .appendingPathComponent("QwenModels")
         return appSupportDirectory
+            .appendingPathComponent("mlx-audio")
+            .appendingPathComponent(repoId.replacingOccurrences(of: "/", with: "_"))
+    }
+
+    var isDownloaded: Bool {
+        FileManager.default.fileExists(atPath: storageDirectory.path)
+    }
+}
+
+struct CohereLocalModel: AddonLocalModel {
+    static let languageNames: [String: String] = [
+        "ar": "Arabic",
+        "de": "German",
+        "el": "Greek",
+        "en": "English",
+        "es": "Spanish",
+        "fr": "French",
+        "it": "Italian",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "nl": "Dutch",
+        "pl": "Polish",
+        "pt": "Portuguese",
+        "vi": "Vietnamese",
+        "zh": "Chinese"
+    ]
+
+    static func supportedLanguageDictionary() -> [String: String] {
+        PredefinedModels.allLanguages.filter { languageNames[$0.key] != nil }
+    }
+
+    let id = UUID()
+    let name: String
+    let displayName: String
+    let repoId: String
+    let size: String
+    let ramRequirement: String
+    let supportedLanguages: [String: String]
+    let description: String
+    let provider: ModelProvider = .local
+    let addonIdentifier = "cohere-transcribe"
+
+    var isMultilingualModel: Bool {
+        supportedLanguages.count > 1
+    }
+
+    var storageDirectory: URL {
+        HubCache.default.cacheDirectory
             .appendingPathComponent("mlx-audio")
             .appendingPathComponent(repoId.replacingOccurrences(of: "/", with: "_"))
     }

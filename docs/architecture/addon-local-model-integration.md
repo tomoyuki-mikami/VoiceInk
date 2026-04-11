@@ -1,6 +1,6 @@
 # Add-on Local Model Integration
 
-`Qwen3-ASR` や `Parakeet Japanese` のような fork 固有モデルは、できるだけ既存実装の内側へ混ぜ込まず、追加レイヤーとして外付けする。
+`Qwen3-ASR`、`Cohere Transcribe`、`Parakeet Japanese` のような fork 固有モデルは、できるだけ既存実装の内側へ混ぜ込まず、追加レイヤーとして外付けする。
 
 狙いは次の 3 つです。
 
@@ -25,14 +25,16 @@ flowchart LR
         AModelMgr["AddonAwareTranscriptionModelManager"]
         ARegistry["AddonAwareTranscriptionServiceRegistry"]
         Prep["AddonAwareModelPreparationCoordinator"]
-        Integrations["AddonLocalIntegration 群<br/>Qwen / Parakeet"]
+        Integrations["AddonLocalIntegration 群<br/>Qwen / Cohere / Parakeet"]
         AddonUI["AddonAwareModelManagementContentView"]
         QwenSvc["QwenTranscriptionService"]
+        CohereSvc["CohereTranscriptionService"]
         ParaSvc["JapaneseParakeetTranscriptionService"]
     end
 
     subgraph Models["追加モデル実装"]
         Qwen["Qwen3-ASR"]
+        Cohere["Cohere Transcribe"]
         Parakeet["Parakeet Japanese"]
     end
 
@@ -50,9 +52,11 @@ flowchart LR
 
     Catalog --> Integrations
     Integrations --> QwenSvc
+    Integrations --> CohereSvc
     Integrations --> ParaSvc
 
     QwenSvc --> Qwen
+    CohereSvc --> Cohere
     ParaSvc --> Parakeet
 
     Catalog -->|"どの add-on を使うか判定"| AModelMgr
@@ -64,7 +68,7 @@ flowchart LR
 
 - 既存側で触るのは主に `VoiceInk.swift`、`VoiceInkEngine`、`ModelManagementView` のような入口だけ
 - add-on 固有の判定、モデル一覧の統合、ダウンロード済み判定、準備処理、文字起こしサービス切り替えは `AddonAware*` と `AddonLocalModelCatalog` に寄せる
-- `Qwen` や `Parakeet` の個別実装は `Integration` と専用 service の下に閉じ込める
+- `Qwen`、`Cohere`、`Parakeet` の個別実装は `Integration` と専用 service の下に閉じ込める
 
 ## Practical Rule
 
@@ -86,6 +90,8 @@ flowchart LR
 
 upstream との差分を増やしすぎないことを優先しているため、add-on モデルでは prewarm と Power Mode 用の初期ロードにはまだ対応していない。
 
-そのため、`Qwen3-ASR` や `Parakeet Japanese` を選んだ直後の最初の 1 回は、モデル準備のぶんだけ少し待ち時間が長くなる。
+そのため、`Qwen3-ASR`、`Cohere Transcribe`、`Parakeet Japanese` を選んだ直後の最初の 1 回は、モデル準備のぶんだけ少し待ち時間が長くなる。
+
+`Cohere Transcribe` だけは、`MLXAudioSTT` の公開 API がカスタム cache 注入をまだ受けていないため、保存先は VoiceInk の `Application Support` 配下ではなく Hugging Face の既定 cache 配下を使う。
 
 2 回目以降は、同じ実行中セッション内でモデルが準備済みなら、最初の 1 回ほどの遅さは出にくい。
