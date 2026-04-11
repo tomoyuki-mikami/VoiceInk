@@ -106,7 +106,11 @@ struct VoiceInkApp: App {
 
         let whisperModelManager = WhisperModelManager(modelsDirectory: whisperModelsDirectory)
         let qwenModelManager = QwenModelManager(modelsDirectory: qwenModelsDirectory)
-        let addonLocalModelCatalog = AddonLocalModelCatalog(qwenModelManager: qwenModelManager)
+        let cohereModelManager = CohereModelManager()
+        let addonLocalModelCatalog = AddonLocalModelCatalog(
+            qwenModelManager: qwenModelManager,
+            cohereModelManager: cohereModelManager
+        )
         let fluidAudioModelManager = FluidAudioModelManager()
         let transcriptionModelManager = AddonAwareTranscriptionModelManager(
             whisperModelManager: whisperModelManager,

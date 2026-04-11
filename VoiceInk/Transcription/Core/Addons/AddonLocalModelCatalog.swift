@@ -12,10 +12,14 @@ final class AddonLocalModelCatalog: ObservableObject {
 
     init(
         qwenModelManager: QwenModelManager,
+        cohereModelManager: CohereModelManager? = nil,
         japaneseParakeetModelManager: JapaneseParakeetModelManager? = nil
     ) {
         self.integrations = [
             QwenAddonLocalIntegration(modelManager: qwenModelManager),
+            CohereAddonLocalIntegration(
+                modelManager: cohereModelManager ?? CohereModelManager()
+            ),
             JapaneseParakeetAddonLocalIntegration(
                 modelManager: japaneseParakeetModelManager ?? JapaneseParakeetModelManager()
             )
