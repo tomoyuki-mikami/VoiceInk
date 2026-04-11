@@ -24,6 +24,6 @@ extension VoiceInkEngine: PowerModeStateProvider {
     }
 
     func prepareTranscriptionModel(_ model: any TranscriptionModel) async throws {
-        try await serviceRegistry.prepareModelIfNeeded(model)
+        try await prepareSelectedModel(model)
     }
 }

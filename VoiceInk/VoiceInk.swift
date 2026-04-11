@@ -12,18 +12,7 @@ struct VoiceInkApp: App {
     let container: ModelContainer
     let containerInitializationFailed: Bool
 
-    @StateObject private var engine: VoiceInkEngine
-    @StateObject private var whisperModelManager: WhisperModelManager
-    @StateObject private var addonLocalModelCatalog: AddonLocalModelCatalog
-    @StateObject private var fluidAudioModelManager: FluidAudioModelManager
-    @StateObject private var transcriptionModelManager: TranscriptionModelManager
-    @StateObject private var recorderUIManager: RecorderUIManager
-    @StateObject private var hotkeyManager: HotkeyManager
-    @StateObject private var updaterViewModel: UpdaterViewModel
-    @StateObject private var menuBarManager: MenuBarManager
-    @StateObject private var aiService = AIService()
-    @StateObject private var enhancementService: AIEnhancementService
-    @StateObject private var activeWindowService = ActiveWindowService.shared
+    @StateObject private var runtime: VoiceInkAppRuntime
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("enableAnnouncements") private var enableAnnouncements = true
     @State private var showMenuBarIcon = true
@@ -33,9 +22,6 @@ struct VoiceInkApp: App {
 
     // Transcription auto-cleanup service for zero data retention
     private let transcriptionAutoCleanupService = TranscriptionAutoCleanupService.shared
-
-    // Model prewarm service for optimizing model on wake from sleep
-    @StateObject private var prewarmService: ModelPrewarmService
 
     init() {
         // Disable HTTP response caching — prevents API responses from being stored in Cache.db
@@ -90,55 +76,10 @@ struct VoiceInkApp: App {
 
         containerInitializationFailed = initializationFailed
 
-        // Initialize services with proper sharing of instances
-        let aiService = AIService()
-        _aiService = StateObject(wrappedValue: aiService)
+        let runtime = VoiceInkAppRuntime(container: container)
+        _runtime = StateObject(wrappedValue: runtime)
 
-        let updaterViewModel = UpdaterViewModel()
-        _updaterViewModel = StateObject(wrappedValue: updaterViewModel)
-
-        let enhancementService = AIEnhancementService(aiService: aiService, modelContext: container.mainContext)
-        _enhancementService = StateObject(wrappedValue: enhancementService)
-
-        let dependencies = VoiceInkAppDependencies.make(
-            container: container,
-            enhancementService: enhancementService
-        )
-
-        let whisperModelManager = dependencies.whisperModelManager
-        let addonLocalModelCatalog = dependencies.addonLocalModelCatalog
-        let fluidAudioModelManager = dependencies.fluidAudioModelManager
-        let transcriptionModelManager = dependencies.transcriptionModelManager
-        let recorderUIManager = dependencies.recorderUIManager
-        let engine = dependencies.engine
-
-        _whisperModelManager = StateObject(wrappedValue: whisperModelManager)
-        _addonLocalModelCatalog = StateObject(wrappedValue: addonLocalModelCatalog)
-        _fluidAudioModelManager = StateObject(wrappedValue: fluidAudioModelManager)
-        _transcriptionModelManager = StateObject(wrappedValue: transcriptionModelManager)
-        _recorderUIManager = StateObject(wrappedValue: recorderUIManager)
-        _engine = StateObject(wrappedValue: engine)
-
-        let hotkeyManager = HotkeyManager(engine: engine, recorderUIManager: recorderUIManager)
-        _hotkeyManager = StateObject(wrappedValue: hotkeyManager)
-
-        let menuBarManager = MenuBarManager()
-        _menuBarManager = StateObject(wrappedValue: menuBarManager)
-        menuBarManager.configure(modelContainer: container, engine: engine)
-
-        let activeWindowService = ActiveWindowService.shared
-        activeWindowService.configure(with: enhancementService)
-        _activeWindowService = StateObject(wrappedValue: activeWindowService)
-
-        let prewarmService = dependencies.prewarmService
-        _prewarmService = StateObject(wrappedValue: prewarmService)
-
-        appDelegate.menuBarManager = menuBarManager
-
-        // Ensure no lingering recording state from previous runs
-        Task {
-            await recorderUIManager.resetOnLaunch()
-        }
+        appDelegate.menuBarManager = runtime.menuBarManager
 
         AppShortcuts.updateAppShortcutParameters()
 
@@ -224,17 +165,7 @@ struct VoiceInkApp: App {
         WindowGroup {
             if hasCompletedOnboarding {
                 ContentView()
-                    .environmentObject(engine)
-                    .environmentObject(whisperModelManager)
-                    .environmentObject(addonLocalModelCatalog)
-                    .environmentObject(fluidAudioModelManager)
-                    .environmentObject(transcriptionModelManager)
-                    .environmentObject(recorderUIManager)
-                    .environmentObject(hotkeyManager)
-                    .environmentObject(updaterViewModel)
-                    .environmentObject(menuBarManager)
-                    .environmentObject(aiService)
-                    .environmentObject(enhancementService)
+                    .voiceInkSharedEnvironment(runtime)
                     .modelContainer(container)
                     .onAppear {
                         // Check if container initialization failed
@@ -253,7 +184,7 @@ struct VoiceInkApp: App {
                         // Migrate dictionary data from UserDefaults to SwiftData (one-time operation)
                         DictionaryMigrationService.shared.migrateIfNeeded(context: container.mainContext)
 
-                        updaterViewModel.silentlyCheckForUpdates()
+                        runtime.updaterViewModel.silentlyCheckForUpdates()
                         if enableAnnouncements {
                             AnnouncementsService.shared.start()
                         }
@@ -277,22 +208,14 @@ struct VoiceInkApp: App {
                     })
                     .onDisappear {
                         AnnouncementsService.shared.stop()
-                        whisperModelManager.unloadModel()
+                        runtime.whisperModelManager.unloadModel()
 
                         // Stop the automatic audio cleanup process
                         audioCleanupManager.stopAutomaticCleanup()
                     }
             } else {
                 OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
-                    .environmentObject(hotkeyManager)
-                    .environmentObject(engine)
-                    .environmentObject(whisperModelManager)
-                    .environmentObject(addonLocalModelCatalog)
-                    .environmentObject(fluidAudioModelManager)
-                    .environmentObject(transcriptionModelManager)
-                    .environmentObject(recorderUIManager)
-                    .environmentObject(aiService)
-                    .environmentObject(enhancementService)
+                    .voiceInkSharedEnvironment(runtime)
                     .frame(minWidth: 880, minHeight: 780)
                     .background(WindowAccessor { window in
                         if window.identifier == nil || window.identifier != NSUserInterfaceItemIdentifier("com.prakashjoshipax.voiceink.onboardingWindow") {
@@ -308,23 +231,13 @@ struct VoiceInkApp: App {
             CommandGroup(replacing: .newItem) { }
 
             CommandGroup(after: .appInfo) {
-                CheckForUpdatesView(updaterViewModel: updaterViewModel)
+                CheckForUpdatesView(updaterViewModel: runtime.updaterViewModel)
             }
         }
 
         MenuBarExtra(isInserted: $showMenuBarIcon) {
             MenuBarView()
-                .environmentObject(engine)
-                .environmentObject(whisperModelManager)
-                .environmentObject(addonLocalModelCatalog)
-                .environmentObject(fluidAudioModelManager)
-                .environmentObject(transcriptionModelManager)
-                .environmentObject(recorderUIManager)
-                .environmentObject(hotkeyManager)
-                .environmentObject(menuBarManager)
-                .environmentObject(updaterViewModel)
-                .environmentObject(aiService)
-                .environmentObject(enhancementService)
+                .voiceInkSharedEnvironment(runtime)
         } label: {
             let image: NSImage = {
                 let ratio = $0.size.height / $0.size.width
@@ -340,7 +253,7 @@ struct VoiceInkApp: App {
         #if DEBUG
         WindowGroup("Debug") {
             Button("Toggle Menu Bar Only") {
-                menuBarManager.isMenuBarOnly.toggle()
+                runtime.menuBarManager.isMenuBarOnly.toggle()
             }
         }
         #endif

@@ -26,6 +26,7 @@ class VoiceInkEngine: NSObject, ObservableObject {
     internal let serviceRegistry: TranscriptionServiceRegistry
     let enhancementService: AIEnhancementService?
     private let pipeline: TranscriptionPipeline
+    private let modelPreparationCoordinator: AddonAwareModelPreparationCoordinator
 
     let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "VoiceInkEngine")
 
@@ -51,6 +52,11 @@ class VoiceInkEngine: NSObject, ObservableObject {
             addonLocalModelCatalog: addonLocalModelCatalog,
             modelsDirectory: whisperModelManager.modelsDirectory,
             modelContext: modelContext
+        )
+        self.modelPreparationCoordinator = AddonAwareModelPreparationCoordinator(
+            whisperModelManager: whisperModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog,
+            fluidAudioTranscriptionService: serviceRegistry.fluidAudioTranscriptionService
         )
         self.pipeline = TranscriptionPipeline(
             modelContext: modelContext,
@@ -187,7 +193,7 @@ class VoiceInkEngine: NSObject, ObservableObject {
 
                                 if let model = await self.transcriptionModelManager.currentTranscriptionModel {
                                     do {
-                                        try await self.serviceRegistry.prepareModelIfNeeded(model)
+                                        try await self.modelPreparationCoordinator.prepareTranscriptionModel(model)
                                     } catch {
                                         await self.logger.error("❌ Model loading failed: \(error.localizedDescription, privacy: .public)")
                                     }
@@ -258,6 +264,10 @@ class VoiceInkEngine: NSObject, ObservableObject {
         await whisperModelManager.cleanupResources()
         await serviceRegistry.cleanup()
         logger.notice("cleanupResources: completed")
+    }
+
+    func prepareSelectedModel(_ model: any TranscriptionModel) async throws {
+        try await modelPreparationCoordinator.prepareTranscriptionModel(model)
     }
 
     // MARK: - Notification Handling

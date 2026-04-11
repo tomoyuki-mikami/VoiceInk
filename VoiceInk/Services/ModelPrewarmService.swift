@@ -9,6 +9,7 @@ final class ModelPrewarmService: ObservableObject {
     private let whisperModelManager: WhisperModelManager
     private let addonLocalModelCatalog: AddonLocalModelCatalog
     private let modelContext: ModelContext
+    private let modelPreparationCoordinator: AddonAwareModelPreparationCoordinator
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "ModelPrewarm")
     private lazy var serviceRegistry = AddonAwareTranscriptionServiceRegistry(
         modelProvider: whisperModelManager,
@@ -24,6 +25,11 @@ final class ModelPrewarmService: ObservableObject {
         self.whisperModelManager = whisperModelManager
         self.addonLocalModelCatalog = addonLocalModelCatalog
         self.modelContext = modelContext
+        self.modelPreparationCoordinator = AddonAwareModelPreparationCoordinator(
+            whisperModelManager: whisperModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog,
+            fluidAudioTranscriptionService: FluidAudioTranscriptionService()
+        )
         setupNotifications()
         schedulePrewarmOnAppLaunch()
     }
@@ -108,17 +114,12 @@ final class ModelPrewarmService: ObservableObject {
             return false
         }
 
-        if addonLocalModelCatalog.contains(model) {
+        if modelPreparationCoordinator.shouldPrewarm(model) {
             return true
         }
 
-        switch model.provider {
-        case .local, .fluidAudio:
-            return true
-        default:
-            logger.notice("Skipping prewarm - cloud models don't need it")
-            return false
-        }
+        logger.notice("Skipping prewarm - cloud models don't need it")
+        return false
     }
 
     deinit {
