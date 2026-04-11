@@ -219,7 +219,7 @@ struct ModelManagementView: View {
                             downloadAction: {
                                 if let localModel = model as? LocalModel {
                                     Task { await whisperModelManager.downloadModel(localModel) }
-                                } else if addonLocalModelCatalog.includes(model) {
+                                } else if addonLocalModelCatalog.contains(model) {
                                     Task { await addonLocalModelCatalog.downloadModel(model) }
                                 }
                             },
@@ -319,19 +319,23 @@ struct ModelManagementView: View {
     private var filteredModels: [any TranscriptionModel] {
         switch selectedFilter {
         case .recommended:
+            let recommendedNames = [
+                "ggml-base.en",
+                "parakeet-tdt-0.6b-v2",
+                "ggml-large-v3-turbo-q5_0",
+                "whisper-large-v3-turbo"
+            ] + addonLocalModelCatalog.recommendedModelNames
             return transcriptionModelManager.allAvailableModels.filter {
-                let recommendedNames = ["ggml-base.en", "parakeet-tdt-0.6b-v2", "parakeet-tdt_ctc-0.6b-ja", "ggml-large-v3-turbo-q5_0", "whisper-large-v3-turbo"]
                 return recommendedNames.contains($0.name)
             }.sorted { model1, model2 in
-                let recommendedOrder = ["ggml-base.en", "parakeet-tdt-0.6b-v2", "parakeet-tdt_ctc-0.6b-ja", "ggml-large-v3-turbo-q5_0", "whisper-large-v3-turbo"]
-                let index1 = recommendedOrder.firstIndex(of: model1.name) ?? Int.max
-                let index2 = recommendedOrder.firstIndex(of: model2.name) ?? Int.max
+                let index1 = recommendedNames.firstIndex(of: model1.name) ?? Int.max
+                let index2 = recommendedNames.firstIndex(of: model2.name) ?? Int.max
                 return index1 < index2
             }
         case .local:
             return transcriptionModelManager.allAvailableModels.filter {
                 $0.provider == .local ||
-                addonLocalModelCatalog.includes($0) ||
+                addonLocalModelCatalog.contains($0) ||
                 $0.provider == .nativeApple ||
                 $0.provider == .fluidAudio
             }
@@ -344,7 +348,7 @@ struct ModelManagementView: View {
     }
 
     private func isModelDownloaded(_ model: any TranscriptionModel) -> Bool {
-        if addonLocalModelCatalog.includes(model) {
+        if addonLocalModelCatalog.contains(model) {
             return addonLocalModelCatalog.isModelDownloaded(model)
         }
 
@@ -357,7 +361,7 @@ struct ModelManagementView: View {
     }
 
     private func downloadProgress(for model: any TranscriptionModel) -> [String: Double] {
-        if addonLocalModelCatalog.includes(model) {
+        if addonLocalModelCatalog.contains(model) {
             return addonLocalModelCatalog.progressMap(for: model)
         }
         return whisperModelManager.downloadProgress

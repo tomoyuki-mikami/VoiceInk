@@ -62,6 +62,7 @@ struct ModelCardRowView: View {
                     )
                 }
             case .localAddon:
+                // Add-on cards are rendered by AddonLocalModelCatalog before this switch.
                 EmptyView()
             case .nativeApple:
                 if let nativeAppleModel = model as? NativeAppleModel {

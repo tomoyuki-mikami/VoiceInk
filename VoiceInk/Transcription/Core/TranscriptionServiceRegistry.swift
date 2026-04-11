@@ -66,6 +66,25 @@ class TranscriptionServiceRegistry {
         }
     }
 
+    func prepareModelIfNeeded(_ model: any TranscriptionModel) async throws {
+        if let addonModel = model as? any AddonLocalModel {
+            try await addonLocalModelCatalog?.prepareModel(addonModel)
+            return
+        }
+
+        if model.provider == .local,
+           let whisperModelManager = modelProvider as? WhisperModelManager,
+           let localModel = whisperModelManager.availableModels.first(where: { $0.name == model.name }),
+           whisperModelManager.whisperContext == nil {
+            try await whisperModelManager.loadModel(localModel)
+            return
+        }
+
+        if let fluidAudioModel = model as? FluidAudioModel {
+            try await fluidAudioTranscriptionService.loadModel(for: fluidAudioModel)
+        }
+    }
+
     // Maps streaming-only models to a batch-compatible equivalent for fallback.
     private func batchFallbackModel(for model: any TranscriptionModel) -> (any TranscriptionModel)? {
         switch (model.provider, model.name) {

@@ -15,14 +15,6 @@ extension VoiceInkEngine: PowerModeStateProvider {
         transcriptionModelManager.allAvailableModels
     }
 
-    var availableModels: [WhisperModel] {
-        whisperModelManager.availableModels
-    }
-
-    var availableAddonModels: [any AddonLocalModel] {
-        addonLocalModelCatalog.availableModels
-    }
-
     func setDefaultTranscriptionModel(_ model: any TranscriptionModel) {
         transcriptionModelManager.setDefaultTranscriptionModel(model)
     }
@@ -31,11 +23,7 @@ extension VoiceInkEngine: PowerModeStateProvider {
         await cleanupResources()
     }
 
-    func loadModel(_ model: WhisperModel) async throws {
-        try await whisperModelManager.loadModel(model)
-    }
-
-    func loadAddonModel(_ model: any AddonLocalModel) async throws {
-        try await addonLocalModelCatalog.prepareModel(model)
+    func prepareTranscriptionModel(_ model: any TranscriptionModel) async throws {
+        try await serviceRegistry.prepareModelIfNeeded(model)
     }
 }

@@ -137,7 +137,7 @@ class PowerModeSessionManager {
         }
 
         if let modelName = config.selectedTranscriptionModelName,
-           let selectedModel = await stateProvider.allAvailableModels.first(where: { $0.name == modelName }),
+           let selectedModel = stateProvider.allAvailableModels.first(where: { $0.name == modelName }),
            stateProvider.currentTranscriptionModel?.name != modelName {
             await handleModelChange(to: selectedModel)
         }
@@ -172,7 +172,7 @@ class PowerModeSessionManager {
         }
 
         if let modelName = state.transcriptionModelName,
-           let selectedModel = await stateProvider.allAvailableModels.first(where: { $0.name == modelName }),
+           let selectedModel = stateProvider.allAvailableModels.first(where: { $0.name == modelName }),
            stateProvider.currentTranscriptionModel?.name != modelName {
             await handleModelChange(to: selectedModel)
         }
@@ -181,36 +181,23 @@ class PowerModeSessionManager {
     private func handleModelChange(to newModel: any TranscriptionModel) async {
         guard let stateProvider = stateProvider else { return }
 
-        await stateProvider.setDefaultTranscriptionModel(newModel)
+        stateProvider.setDefaultTranscriptionModel(newModel)
+        await stateProvider.cleanupModelResources()
 
         switch newModel.provider {
-        case .local:
-            await stateProvider.cleanupModelResources()
-            if let localModel = await stateProvider.availableModels.first(where: { $0.name == newModel.name }) {
-                do {
-                    try await stateProvider.loadModel(localModel)
-                } catch {
-                    print("Power Mode: Failed to load local model '\(localModel.name)': \(error)")
-                }
+        case .local, .localAddon, .fluidAudio:
+            do {
+                try await stateProvider.prepareTranscriptionModel(newModel)
+            } catch {
+                print("Power Mode: Failed to prepare model '\(newModel.name)': \(error)")
             }
-        case .localAddon:
-            await stateProvider.cleanupModelResources()
-            if let addonModel = await stateProvider.availableAddonModels.first(where: { $0.name == newModel.name }) {
-                do {
-                    try await stateProvider.loadAddonModel(addonModel)
-                } catch {
-                    print("Power Mode: Failed to load add-on model '\(addonModel.name)': \(error)")
-                }
-            }
-        case .fluidAudio:
-            await stateProvider.cleanupModelResources()
         default:
-            await stateProvider.cleanupModelResources()
+            break
         }
     }
 
     private func recoverSession() {
-        guard let session = loadSession() else { return }
+        guard loadSession() != nil else { return }
         print("Recovering abandoned Power Mode session.")
         Task {
             await endSession()

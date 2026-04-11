@@ -108,8 +108,12 @@ final class ModelPrewarmService: ObservableObject {
             return false
         }
 
+        if addonLocalModelCatalog.contains(model) {
+            return true
+        }
+
         switch model.provider {
-        case .local, .localAddon, .fluidAudio:
+        case .local, .fluidAudio:
             return true
         default:
             logger.notice("Skipping prewarm - cloud models don't need it")

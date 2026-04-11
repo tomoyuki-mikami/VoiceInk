@@ -1,15 +1,10 @@
 import Foundation
 import SwiftUI
 import Combine
-import AppKit
 
 @MainActor
 final class AddonLocalModelCatalog: ObservableObject {
-    let qwenModelManager: QwenModelManager
-    let japaneseParakeetModelManager: JapaneseParakeetModelManager
-
-    private let qwenTranscriptionService: QwenTranscriptionService
-    private let japaneseParakeetTranscriptionService: JapaneseParakeetTranscriptionService
+    private let integrations: [any AddonLocalModelIntegration]
     private var cancellables: Set<AnyCancellable> = []
 
     var onModelDeleted: ((String) -> Void)?
@@ -19,17 +14,19 @@ final class AddonLocalModelCatalog: ObservableObject {
         qwenModelManager: QwenModelManager,
         japaneseParakeetModelManager: JapaneseParakeetModelManager? = nil
     ) {
-        self.qwenModelManager = qwenModelManager
-        self.japaneseParakeetModelManager = japaneseParakeetModelManager ?? JapaneseParakeetModelManager()
-        self.qwenTranscriptionService = QwenTranscriptionService(modelProvider: qwenModelManager)
-        self.japaneseParakeetTranscriptionService = JapaneseParakeetTranscriptionService()
+        self.integrations = [
+            QwenAddonLocalIntegration(modelManager: qwenModelManager),
+            JapaneseParakeetAddonLocalIntegration(
+                modelManager: japaneseParakeetModelManager ?? JapaneseParakeetModelManager()
+            )
+        ]
 
         bindManagers()
         wireCallbacks()
     }
 
     var availableModels: [any AddonLocalModel] {
-        AddonLocalModels.allModels
+        integrations.flatMap(\.models)
     }
 
     var availableTranscriptionModels: [any TranscriptionModel] {
@@ -37,7 +34,7 @@ final class AddonLocalModelCatalog: ObservableObject {
     }
 
     func includes(_ model: any TranscriptionModel) -> Bool {
-        model is any AddonLocalModel
+        contains(model)
     }
 
     func merged(into models: [any TranscriptionModel]) -> [any TranscriptionModel] {
@@ -51,62 +48,57 @@ final class AddonLocalModelCatalog: ObservableObject {
     }
 
     func createModelsDirectoryIfNeeded() {
-        qwenModelManager.createModelsDirectoryIfNeeded()
+        integrations.forEach { $0.createModelsDirectoryIfNeeded() }
     }
 
     func refreshAvailableModels() {
-        qwenModelManager.refreshAvailableModels()
+        integrations.forEach { $0.refreshAvailableModels() }
         onModelsChanged?()
     }
 
+    var recommendedModelNames: [String] {
+        integrations.flatMap(\.recommendedModelNames)
+    }
+
+    func contains(_ model: any TranscriptionModel) -> Bool {
+        integration(for: model) != nil
+    }
+
     func isModelDownloaded(named name: String) -> Bool {
-        if let model = AddonLocalModels.qwenModels.first(where: { $0.name == name }) {
-            return qwenModelManager.isModelDownloaded(named: model.name)
-        }
-
-        if let model = AddonLocalModels.japaneseParakeetModels.first(where: { $0.name == name }) {
-            return japaneseParakeetModelManager.isModelDownloaded(model)
-        }
-
-        return false
+        guard let model = availableModels.first(where: { $0.name == name }) else { return false }
+        return integration(for: model)?.isModelDownloaded(model) ?? false
     }
 
     func isModelDownloaded(_ model: any TranscriptionModel) -> Bool {
-        guard includes(model) else { return false }
-        return isModelDownloaded(named: model.name)
+        guard let addonModel = addonModel(from: model),
+              let integration = integration(for: addonModel) else {
+            return false
+        }
+
+        return integration.isModelDownloaded(addonModel)
     }
 
     func progressMap(for model: any TranscriptionModel) -> [String: Double] {
-        if let qwenModel = model as? QwenLocalModel, qwenModelManager.downloadInProgress.contains(qwenModel.name) {
-            return [qwenModel.name: 0.0]
+        guard let addonModel = addonModel(from: model),
+              let integration = integration(for: addonModel) else {
+            return [:]
         }
 
-        if let japaneseModel = model as? JapaneseParakeetLocalModel, japaneseParakeetModelManager.downloadInProgress {
-            return [japaneseModel.name: japaneseParakeetModelManager.downloadProgress]
-        }
-
-        return [:]
+        return integration.progressMap(for: addonModel)
     }
 
     func service(for model: any TranscriptionModel) -> TranscriptionService? {
-        switch model {
-        case is QwenLocalModel:
-            return qwenTranscriptionService
-        case is JapaneseParakeetLocalModel:
-            return japaneseParakeetTranscriptionService
-        default:
+        guard let addonModel = addonModel(from: model),
+              let integration = integration(for: addonModel) else {
             return nil
         }
+
+        return integration.service(for: addonModel)
     }
 
     func downloadModel(_ model: any AddonLocalModel) async {
-        switch model {
-        case let qwenModel as QwenLocalModel:
-            await qwenModelManager.downloadModel(qwenModel)
-        case let japaneseModel as JapaneseParakeetLocalModel:
-            await japaneseParakeetModelManager.downloadModel(japaneseModel)
-        default:
-            break
+        if let integration = integration(for: model) {
+            await integration.downloadModel(model)
         }
     }
 
@@ -116,13 +108,8 @@ final class AddonLocalModelCatalog: ObservableObject {
     }
 
     func deleteModel(_ model: any AddonLocalModel) async {
-        switch model {
-        case let qwenModel as QwenLocalModel:
-            await qwenModelManager.deleteModel(qwenModel)
-        case let japaneseModel as JapaneseParakeetLocalModel:
-            await japaneseParakeetModelManager.deleteModel(japaneseModel)
-        default:
-            break
+        if let integration = integration(for: model) {
+            await integration.deleteModel(model)
         }
     }
 
@@ -132,33 +119,26 @@ final class AddonLocalModelCatalog: ObservableObject {
     }
 
     func prepareModel(_ model: any AddonLocalModel) async throws {
-        switch model {
-        case let qwenModel as QwenLocalModel:
-            try await qwenModelManager.loadModel(qwenModel)
-        case is JapaneseParakeetLocalModel:
-            try await japaneseParakeetTranscriptionService.prepareModel()
-        default:
+        guard let integration = integration(for: model) else {
             throw VoiceInkEngineError.modelLoadFailed
         }
+
+        try await integration.prepareModel(model)
     }
 
     func unloadModelResources() {
-        qwenModelManager.unloadModel()
+        integrations.forEach { $0.unloadModelResources() }
     }
 
     func cleanupResources() async {
-        qwenModelManager.unloadModel()
-        await japaneseParakeetTranscriptionService.cleanup()
+        for integration in integrations {
+            await integration.cleanupResources()
+        }
     }
 
     func showModelInFinder(_ model: any AddonLocalModel) {
-        switch model {
-        case let qwenModel as QwenLocalModel:
-            NSWorkspace.shared.selectFile(qwenModel.storageDirectory.path, inFileViewerRootedAtPath: "")
-        case let japaneseModel as JapaneseParakeetLocalModel:
-            japaneseParakeetModelManager.showModelInFinder(japaneseModel)
-        default:
-            break
+        if let integration = integration(for: model) {
+            integration.showModelInFinder(model)
         }
     }
 
@@ -170,36 +150,18 @@ final class AddonLocalModelCatalog: ObservableObject {
         setDefaultAction: @escaping () -> Void,
         downloadAction: @escaping () -> Void
     ) -> AnyView {
-        switch model {
-        case let qwenModel as QwenLocalModel:
-            return AnyView(
-                QwenModelCardView(
-                    model: qwenModel,
-                    isDownloaded: isDownloaded,
-                    isCurrent: isCurrent,
-                    isPreparing: qwenModelManager.downloadInProgress.contains(qwenModel.name),
-                    deleteAction: deleteAction,
-                    setDefaultAction: setDefaultAction,
-                    downloadAction: downloadAction
-                )
-            )
-        case let japaneseModel as JapaneseParakeetLocalModel:
-            return AnyView(
-                JapaneseParakeetModelCardView(
-                    model: japaneseModel,
-                    isDownloaded: isDownloaded,
-                    isCurrent: isCurrent,
-                    isDownloading: japaneseParakeetModelManager.downloadInProgress,
-                    downloadProgress: japaneseParakeetModelManager.downloadProgress,
-                    deleteAction: deleteAction,
-                    setDefaultAction: setDefaultAction,
-                    downloadAction: downloadAction,
-                    showInFinderAction: { self.showModelInFinder(japaneseModel) }
-                )
-            )
-        default:
+        guard let integration = integration(for: model) else {
             return AnyView(EmptyView())
         }
+
+        return integration.cardView(
+            for: model,
+            isDownloaded: isDownloaded,
+            isCurrent: isCurrent,
+            deleteAction: deleteAction,
+            setDefaultAction: setDefaultAction,
+            downloadAction: downloadAction
+        )
     }
 
     func cardView(
@@ -225,28 +187,33 @@ final class AddonLocalModelCatalog: ObservableObject {
     }
 
     private func bindManagers() {
-        qwenModelManager.objectWillChange
-            .sink { [weak self] _ in self?.objectWillChange.send() }
-            .store(in: &cancellables)
-
-        japaneseParakeetModelManager.objectWillChange
-            .sink { [weak self] _ in self?.objectWillChange.send() }
-            .store(in: &cancellables)
+        integrations.forEach { integration in
+            integration.objectWillChangePublisher
+                .sink { [weak self] in self?.objectWillChange.send() }
+                .store(in: &cancellables)
+        }
     }
 
     private func wireCallbacks() {
-        qwenModelManager.onModelDeleted = { [weak self] modelName in
-            self?.onModelDeleted?(modelName)
+        integrations.forEach { integration in
+            integration.onModelDeleted = { [weak self] modelName in
+                self?.onModelDeleted?(modelName)
+            }
+            integration.onModelsChanged = { [weak self] in
+                self?.onModelsChanged?()
+            }
         }
-        qwenModelManager.onModelsChanged = { [weak self] in
-            self?.onModelsChanged?()
-        }
+    }
 
-        japaneseParakeetModelManager.onModelDeleted = { [weak self] modelName in
-            self?.onModelDeleted?(modelName)
-        }
-        japaneseParakeetModelManager.onModelsChanged = { [weak self] in
-            self?.onModelsChanged?()
-        }
+    private func integration(for model: any TranscriptionModel) -> (any AddonLocalModelIntegration)? {
+        integrations.first { $0.handles(model) }
+    }
+
+    private func integration(for model: any AddonLocalModel) -> (any AddonLocalModelIntegration)? {
+        integrations.first { $0.handles(model) }
+    }
+
+    private func addonModel(from model: any TranscriptionModel) -> (any AddonLocalModel)? {
+        model as? any AddonLocalModel
     }
 }

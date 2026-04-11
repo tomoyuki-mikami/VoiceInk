@@ -45,7 +45,7 @@ class TranscriptionModelManager: ObservableObject {
 
     var usableModels: [any TranscriptionModel] {
         allAvailableModels.filter { model in
-            if addonLocalModelCatalog?.includes(model) == true {
+            if addonLocalModelCatalog?.contains(model) == true {
                 return addonLocalModelCatalog?.isModelDownloaded(model) ?? false
             }
 
@@ -101,7 +101,7 @@ class TranscriptionModelManager: ObservableObject {
             whisperModelManager?.loadedLocalModel = nil
             whisperModelManager?.isModelLoaded = true
         }
-        if addonLocalModelCatalog?.includes(model) != true {
+        if addonLocalModelCatalog?.contains(model) != true {
             addonLocalModelCatalog?.unloadModelResources()
         }
 
