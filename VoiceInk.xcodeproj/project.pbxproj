@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		E11BBA4E2E5DC555000AB839 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = E11BBA4D2E5DC555000AB839 /* FluidAudio */; };
 		E11BBA502F000001000AB839 /* MLXAudioSTT in Frameworks */ = {isa = PBXBuildFile; productRef = E11BBA512F000001000AB839 /* MLXAudioSTT */; };
-		E11BBA522F000001000AB839 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = E11BBA532F000001000AB839 /* MLXAudioCore */; };
 		E1342C1F2EB4844800CED8A2 /* Atomics in Frameworks */ = {isa = PBXBuildFile; productRef = E1342C1E2EB4844800CED8A2 /* Atomics */; };
 		E15433AB2F86A73C0083437A /* LLMkit in Frameworks */ = {isa = PBXBuildFile; productRef = E15433AA2F86A73C0083437A /* LLMkit */; };
 		E161D4A12F41ECB90086F83D /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E161D4A02F41ECB90086F83D /* CloudKit.framework */; };
@@ -95,7 +94,6 @@
 				E1ADD45A2CC5352A00303ECB /* LaunchAtLogin in Frameworks */,
 				E11BBA4E2E5DC555000AB839 /* FluidAudio in Frameworks */,
 				E11BBA502F000001000AB839 /* MLXAudioSTT in Frameworks */,
-				E11BBA522F000001000AB839 /* MLXAudioCore in Frameworks */,
 				E1D7EF992E35E16C00640029 /* MediaRemoteAdapter in Frameworks */,
 				E161D4A12F41ECB90086F83D /* CloudKit.framework in Frameworks */,
 				E1ADD45F2CC544F100303ECB /* Sparkle in Frameworks */,
@@ -182,7 +180,6 @@
 				E1ECEC152E44591300DFFBA8 /* Zip */,
 				E11BBA4D2E5DC555000AB839 /* FluidAudio */,
 				E11BBA512F000001000AB839 /* MLXAudioSTT */,
-				E11BBA532F000001000AB839 /* MLXAudioCore */,
 				E1342C1E2EB4844800CED8A2 /* Atomics */,
 				E1F1037A2EF85FC700A4FF94 /* SelectedTextKit */,
 				E15433AA2F86A73C0083437A /* LLMkit */,
@@ -502,7 +499,6 @@
 				MARKETING_VERSION = 1.72;
 				PRODUCT_BUNDLE_IDENTIFIER = com.prakashjoshipax.VoiceInk;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG ENABLE_NATIVE_SPEECH_ANALYZER $(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -537,7 +533,6 @@
 				MARKETING_VERSION = 1.72;
 				PRODUCT_BUNDLE_IDENTIFIER = com.prakashjoshipax.VoiceInk;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "ENABLE_NATIVE_SPEECH_ANALYZER $(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -746,11 +741,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E11BBA542F000001000AB839 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
 			productName = MLXAudioSTT;
-		};
-		E11BBA532F000001000AB839 /* MLXAudioCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E11BBA542F000001000AB839 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
-			productName = MLXAudioCore;
 		};
 		E1342C1E2EB4844800CED8A2 /* Atomics */ = {
 			isa = XCSwiftPackageProductDependency;
