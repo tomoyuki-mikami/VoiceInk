@@ -3,7 +3,6 @@ import AppKit
 
 struct ModelCardRowView: View {
     let model: any TranscriptionModel
-    let addonLocalModelCatalog: AddonLocalModelCatalog
     let fluidAudioModelManager: FluidAudioModelManager
     let transcriptionModelManager: TranscriptionModelManager
     let isDownloaded: Bool
@@ -19,16 +18,6 @@ struct ModelCardRowView: View {
     var editAction: ((CustomCloudModel) -> Void)?
     var body: some View {
         Group {
-            if let addonCard = addonLocalModelCatalog.cardView(
-                for: model,
-                isDownloaded: isDownloaded,
-                isCurrent: isCurrent,
-                deleteAction: deleteAction,
-                setDefaultAction: setDefaultAction,
-                downloadAction: downloadAction
-            ) {
-                addonCard
-            } else {
             switch model.provider {
             case .local:
                 if let localModel = model as? LocalModel {
@@ -61,9 +50,6 @@ struct ModelCardRowView: View {
                         transcriptionModelManager: transcriptionModelManager
                     )
                 }
-            case .localAddon:
-                // Add-on cards are rendered by AddonLocalModelCatalog before this switch.
-                EmptyView()
             case .nativeApple:
                 if let nativeAppleModel = model as? NativeAppleModel {
                     NativeAppleModelCardView(
@@ -90,7 +76,6 @@ struct ModelCardRowView: View {
                         editAction: editAction ?? { _ in }
                     )
                 }
-            }
             }
         }
     }

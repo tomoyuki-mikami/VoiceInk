@@ -7,22 +7,17 @@ class TranscriptionModelManager: ObservableObject {
     @Published var currentTranscriptionModel: (any TranscriptionModel)?
     @Published var allAvailableModels: [any TranscriptionModel] = PredefinedModels.models
 
-    private weak var whisperModelManager: WhisperModelManager?
-    private weak var addonLocalModelCatalog: AddonLocalModelCatalog?
-    private weak var fluidAudioModelManager: FluidAudioModelManager?
+    internal weak var whisperModelManager: WhisperModelManager?
+    internal weak var fluidAudioModelManager: FluidAudioModelManager?
 
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionModelManager")
 
-    init(whisperModelManager: WhisperModelManager, addonLocalModelCatalog: AddonLocalModelCatalog, fluidAudioModelManager: FluidAudioModelManager) {
+    init(whisperModelManager: WhisperModelManager, fluidAudioModelManager: FluidAudioModelManager) {
         self.whisperModelManager = whisperModelManager
-        self.addonLocalModelCatalog = addonLocalModelCatalog
         self.fluidAudioModelManager = fluidAudioModelManager
 
         // Wire up deletion callbacks so each manager notifies this manager.
         whisperModelManager.onModelDeleted = { [weak self] modelName in
-            self?.handleModelDeleted(modelName)
-        }
-        addonLocalModelCatalog.onModelDeleted = { [weak self] modelName in
             self?.handleModelDeleted(modelName)
         }
         fluidAudioModelManager.onModelDeleted = { [weak self] modelName in
@@ -31,9 +26,6 @@ class TranscriptionModelManager: ObservableObject {
 
         // Wire up "models changed" callbacks so this manager rebuilds allAvailableModels.
         whisperModelManager.onModelsChanged = { [weak self] in
-            self?.refreshAllAvailableModels()
-        }
-        addonLocalModelCatalog.onModelsChanged = { [weak self] in
             self?.refreshAllAvailableModels()
         }
         fluidAudioModelManager.onModelsChanged = { [weak self] in
@@ -45,15 +37,9 @@ class TranscriptionModelManager: ObservableObject {
 
     var usableModels: [any TranscriptionModel] {
         allAvailableModels.filter { model in
-            if addonLocalModelCatalog?.contains(model) == true {
-                return addonLocalModelCatalog?.isModelDownloaded(model) ?? false
-            }
-
             switch model.provider {
             case .local:
                 return whisperModelManager?.availableModels.contains { $0.name == model.name } ?? false
-            case .localAddon:
-                return false
             case .fluidAudio:
                 return fluidAudioModelManager?.isFluidAudioModelDownloaded(named: model.name) ?? false
             case .nativeApple:
@@ -101,9 +87,6 @@ class TranscriptionModelManager: ObservableObject {
             whisperModelManager?.loadedLocalModel = nil
             whisperModelManager?.isModelLoaded = true
         }
-        if addonLocalModelCatalog?.contains(model) != true {
-            addonLocalModelCatalog?.unloadModelResources()
-        }
 
         NotificationCenter.default.post(name: .didChangeModel, object: nil, userInfo: ["modelName": model.name])
         NotificationCenter.default.post(name: .AppSettingsDidChange, object: nil)
@@ -121,8 +104,6 @@ class TranscriptionModelManager: ObservableObject {
                 models.append(importedModel)
             }
         }
-
-        models = addonLocalModelCatalog?.merged(into: models) ?? models
 
         allAvailableModels = models
 
@@ -148,7 +129,6 @@ class TranscriptionModelManager: ObservableObject {
             UserDefaults.standard.removeObject(forKey: "CurrentTranscriptionModel")
             whisperModelManager?.loadedLocalModel = nil
             whisperModelManager?.isModelLoaded = false
-            addonLocalModelCatalog?.unloadModelResources()
             UserDefaults.standard.removeObject(forKey: "CurrentModel")
         }
         refreshAllAvailableModels()

@@ -1,0 +1,52 @@
+import Foundation
+import SwiftData
+
+@MainActor
+final class AddonAwareTranscriptionServiceRegistry: TranscriptionServiceRegistry {
+    private weak var addonLocalModelCatalog: AddonLocalModelCatalog?
+
+    init(
+        modelProvider: any LocalModelProvider,
+        addonLocalModelCatalog: AddonLocalModelCatalog,
+        modelsDirectory: URL,
+        modelContext: ModelContext
+    ) {
+        self.addonLocalModelCatalog = addonLocalModelCatalog
+        super.init(
+            modelProvider: modelProvider,
+            modelsDirectory: modelsDirectory,
+            modelContext: modelContext
+        )
+    }
+
+    override func transcribe(audioURL: URL, model: any TranscriptionModel) async throws -> String {
+        if let addonService = addonLocalModelCatalog?.service(for: model) {
+            logger.debug("Transcribing with \(model.displayName, privacy: .public) using \(String(describing: type(of: addonService)), privacy: .public)")
+            return try await addonService.transcribe(audioURL: audioURL, model: model)
+        }
+
+        return try await super.transcribe(audioURL: audioURL, model: model)
+    }
+
+    override func createSession(for model: any TranscriptionModel, onPartialTranscript: ((String) -> Void)? = nil) -> TranscriptionSession {
+        if let addonService = addonLocalModelCatalog?.service(for: model) {
+            return FileTranscriptionSession(service: addonService)
+        }
+
+        return super.createSession(for: model, onPartialTranscript: onPartialTranscript)
+    }
+
+    override func prepareModelIfNeeded(_ model: any TranscriptionModel) async throws {
+        if let addonModel = model as? any AddonLocalModel {
+            try await addonLocalModelCatalog?.prepareModel(addonModel)
+            return
+        }
+
+        try await super.prepareModelIfNeeded(model)
+    }
+
+    override func cleanup() async {
+        await super.cleanup()
+        await addonLocalModelCatalog?.cleanupResources()
+    }
+}

@@ -100,47 +100,17 @@ struct VoiceInkApp: App {
         let enhancementService = AIEnhancementService(aiService: aiService, modelContext: container.mainContext)
         _enhancementService = StateObject(wrappedValue: enhancementService)
 
-        // 1. Create modelsDirectory URL
-        let appSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("com.prakashjoshipax.VoiceInk")
-        let modelsDirectory = appSupportDirectory.appendingPathComponent("WhisperModels")
-        let qwenModelsDirectory = appSupportDirectory.appendingPathComponent("QwenModels")
-
-        // 2. Create model managers
-        let whisperModelManager = WhisperModelManager(modelsDirectory: modelsDirectory)
-        let qwenModelManager = QwenModelManager(modelsDirectory: qwenModelsDirectory)
-        let addonLocalModelCatalog = AddonLocalModelCatalog(qwenModelManager: qwenModelManager)
-        let fluidAudioModelManager = FluidAudioModelManager()
-        let transcriptionModelManager = TranscriptionModelManager(
-            whisperModelManager: whisperModelManager,
-            addonLocalModelCatalog: addonLocalModelCatalog,
-            fluidAudioModelManager: fluidAudioModelManager
-        )
-
-        // 3. Create UI manager
-        let recorderUIManager = RecorderUIManager()
-
-        // 4. Create engine
-        let engine = VoiceInkEngine(
-            modelContext: container.mainContext,
-            whisperModelManager: whisperModelManager,
-            addonLocalModelCatalog: addonLocalModelCatalog,
-            transcriptionModelManager: transcriptionModelManager,
+        let dependencies = VoiceInkAppDependencies.make(
+            container: container,
             enhancementService: enhancementService
         )
 
-        // 5. Configure circular deps
-        recorderUIManager.configure(engine: engine, recorder: engine.recorder)
-        engine.recorderUIManager = recorderUIManager
-
-        // 6. Initialize model state
-        // refreshAllAvailableModels must run before loadCurrentTranscriptionModel so imported models are present when restoring the saved selection.
-        whisperModelManager.createModelsDirectoryIfNeeded()
-        whisperModelManager.loadAvailableModels()
-        addonLocalModelCatalog.createModelsDirectoryIfNeeded()
-        addonLocalModelCatalog.refreshAvailableModels()
-        transcriptionModelManager.refreshAllAvailableModels()
-        transcriptionModelManager.loadCurrentTranscriptionModel()
+        let whisperModelManager = dependencies.whisperModelManager
+        let addonLocalModelCatalog = dependencies.addonLocalModelCatalog
+        let fluidAudioModelManager = dependencies.fluidAudioModelManager
+        let transcriptionModelManager = dependencies.transcriptionModelManager
+        let recorderUIManager = dependencies.recorderUIManager
+        let engine = dependencies.engine
 
         _whisperModelManager = StateObject(wrappedValue: whisperModelManager)
         _addonLocalModelCatalog = StateObject(wrappedValue: addonLocalModelCatalog)
@@ -149,7 +119,6 @@ struct VoiceInkApp: App {
         _recorderUIManager = StateObject(wrappedValue: recorderUIManager)
         _engine = StateObject(wrappedValue: engine)
 
-        // 7. Create other services that depend on engine
         let hotkeyManager = HotkeyManager(engine: engine, recorderUIManager: recorderUIManager)
         _hotkeyManager = StateObject(wrappedValue: hotkeyManager)
 
@@ -161,12 +130,7 @@ struct VoiceInkApp: App {
         activeWindowService.configure(with: enhancementService)
         _activeWindowService = StateObject(wrappedValue: activeWindowService)
 
-        let prewarmService = ModelPrewarmService(
-            transcriptionModelManager: transcriptionModelManager,
-            whisperModelManager: whisperModelManager,
-            addonLocalModelCatalog: addonLocalModelCatalog,
-            modelContext: container.mainContext
-        )
+        let prewarmService = dependencies.prewarmService
         _prewarmService = StateObject(wrappedValue: prewarmService)
 
         appDelegate.menuBarManager = menuBarManager

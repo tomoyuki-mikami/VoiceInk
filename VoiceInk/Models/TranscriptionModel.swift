@@ -3,7 +3,6 @@ import Foundation
 // Enum to differentiate between model providers
 enum ModelProvider: String, Codable, Hashable, CaseIterable {
     case local = "Local"
-    case localAddon = "Local Add-on"
     case fluidAudio = "Parakeet"
     case groq = "Groq"
     case elevenLabs = "ElevenLabs"

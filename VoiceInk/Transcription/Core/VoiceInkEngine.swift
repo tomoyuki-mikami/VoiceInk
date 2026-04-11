@@ -46,7 +46,7 @@ class VoiceInkEngine: NSObject, ObservableObject {
             .appendingPathComponent("com.prakashjoshipax.VoiceInk")
         self.recordingsDirectory = appSupportDirectory.appendingPathComponent("Recordings")
 
-        self.serviceRegistry = TranscriptionServiceRegistry(
+        self.serviceRegistry = AddonAwareTranscriptionServiceRegistry(
             modelProvider: whisperModelManager,
             addonLocalModelCatalog: addonLocalModelCatalog,
             modelsDirectory: whisperModelManager.modelsDirectory,

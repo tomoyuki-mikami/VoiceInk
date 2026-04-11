@@ -172,7 +172,7 @@ struct ModelManagementView: View {
                             warmupCoordinator.isWarming(modelNamed: localModel.name)
                         } ?? false
 
-                        ModelCardRowView(
+                        AddonAwareModelCardRowView(
                             model: model,
                             addonLocalModelCatalog: addonLocalModelCatalog,
                             fluidAudioModelManager: fluidAudioModelManager,

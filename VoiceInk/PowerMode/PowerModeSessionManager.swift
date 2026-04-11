@@ -185,7 +185,7 @@ class PowerModeSessionManager {
         await stateProvider.cleanupModelResources()
 
         switch newModel.provider {
-        case .local, .localAddon, .fluidAudio:
+        case .local, .fluidAudio:
             do {
                 try await stateProvider.prepareTranscriptionModel(newModel)
             } catch {

@@ -105,7 +105,7 @@ struct QwenLocalModel: AddonLocalModel {
     let speed: Double
     let accuracy: Double
     let ramUsage: Double
-    let provider: ModelProvider = .localAddon
+    let provider: ModelProvider = .local
     let addonIdentifier = "qwen3-asr"
 
     var isMultilingualModel: Bool {
@@ -136,7 +136,7 @@ struct JapaneseParakeetLocalModel: AddonLocalModel {
     let speed: Double
     let accuracy: Double
     let ramUsage: Double
-    let provider: ModelProvider = .localAddon
+    let provider: ModelProvider = .local
     let addonIdentifier = "parakeet-japanese"
 
     var isMultilingualModel: Bool {
