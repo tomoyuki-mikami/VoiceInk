@@ -136,6 +136,7 @@ import Foundation
             ramUsage: 0.8,
             supportedLanguages: getLanguageDictionary(isMultilingual: true, provider: .fluidAudio)
         ),
+
          // Local Models
          LocalModel(
              name: "ggml-tiny",

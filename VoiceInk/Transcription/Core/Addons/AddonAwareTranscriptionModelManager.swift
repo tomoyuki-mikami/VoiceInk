@@ -3,6 +3,8 @@ import Foundation
 @MainActor
 final class AddonAwareTranscriptionModelManager: TranscriptionModelManager {
     private weak var addonLocalModelCatalog: AddonLocalModelCatalog?
+    private weak var whisperModelManagerRef: WhisperModelManager?
+    private weak var fluidAudioModelManagerRef: FluidAudioModelManager?
 
     init(
         whisperModelManager: WhisperModelManager,
@@ -10,6 +12,8 @@ final class AddonAwareTranscriptionModelManager: TranscriptionModelManager {
         fluidAudioModelManager: FluidAudioModelManager
     ) {
         self.addonLocalModelCatalog = addonLocalModelCatalog
+        self.whisperModelManagerRef = whisperModelManager
+        self.fluidAudioModelManagerRef = fluidAudioModelManager
         super.init(
             whisperModelManager: whisperModelManager,
             fluidAudioModelManager: fluidAudioModelManager
@@ -31,9 +35,9 @@ final class AddonAwareTranscriptionModelManager: TranscriptionModelManager {
 
             switch model.provider {
             case .local:
-                return whisperModelManager?.availableModels.contains { $0.name == model.name } ?? false
+                return whisperModelManagerRef?.availableModels.contains { $0.name == model.name } ?? false
             case .fluidAudio:
-                return fluidAudioModelManager?.isFluidAudioModelDownloaded(named: model.name) ?? false
+                return fluidAudioModelManagerRef?.isFluidAudioModelDownloaded(named: model.name) ?? false
             case .nativeApple:
                 if #available(macOS 26, *) {
                     return true
@@ -72,7 +76,7 @@ final class AddonAwareTranscriptionModelManager: TranscriptionModelManager {
         let currentModelName = currentTranscriptionModel?.name
         var models = PredefinedModels.models
 
-        for whisperModel in whisperModelManager?.availableModels ?? [] {
+        for whisperModel in whisperModelManagerRef?.availableModels ?? [] {
             if !models.contains(where: { $0.name == whisperModel.name }) {
                 let importedModel = ImportedLocalModel(fileBaseName: whisperModel.name)
                 models.append(importedModel)
@@ -92,8 +96,8 @@ final class AddonAwareTranscriptionModelManager: TranscriptionModelManager {
         if currentTranscriptionModel?.name == modelName {
             currentTranscriptionModel = nil
             UserDefaults.standard.removeObject(forKey: "CurrentTranscriptionModel")
-            whisperModelManager?.loadedLocalModel = nil
-            whisperModelManager?.isModelLoaded = false
+            whisperModelManagerRef?.loadedLocalModel = nil
+            whisperModelManagerRef?.isModelLoaded = false
             addonLocalModelCatalog?.unloadModelResources()
             UserDefaults.standard.removeObject(forKey: "CurrentModel")
         }

@@ -7,8 +7,8 @@ import os
 class TranscriptionServiceRegistry {
     private weak var modelProvider: (any LocalModelProvider)?
     private let modelsDirectory: URL
-    internal let modelContext: ModelContext
-    internal let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionServiceRegistry")
+    private let modelContext: ModelContext
+    private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionServiceRegistry")
 
     private(set) lazy var localTranscriptionService = LocalTranscriptionService(
         modelsDirectory: modelsDirectory,
@@ -57,20 +57,6 @@ class TranscriptionServiceRegistry {
             return StreamingTranscriptionSession(streamingService: streamingService, fallbackService: fallback, fallbackModel: fallbackModel)
         } else {
             return FileTranscriptionSession(service: service(for: model.provider))
-        }
-    }
-
-    func prepareModelIfNeeded(_ model: any TranscriptionModel) async throws {
-        if model.provider == .local,
-           let whisperModelManager = modelProvider as? WhisperModelManager,
-           let localModel = whisperModelManager.availableModels.first(where: { $0.name == model.name }),
-           whisperModelManager.whisperContext == nil {
-            try await whisperModelManager.loadModel(localModel)
-            return
-        }
-
-        if let fluidAudioModel = model as? FluidAudioModel {
-            try await fluidAudioTranscriptionService.loadModel(for: fluidAudioModel)
         }
     }
 

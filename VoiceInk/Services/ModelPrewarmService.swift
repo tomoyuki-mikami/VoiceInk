@@ -11,7 +11,7 @@ final class ModelPrewarmService: ObservableObject {
     private let modelContext: ModelContext
     private let modelPreparationCoordinator: AddonAwareModelPreparationCoordinator
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "ModelPrewarm")
-    private lazy var serviceRegistry = AddonAwareTranscriptionServiceRegistry(
+    private lazy var serviceRegistry = AddonAwareTranscriptionSupport.makeServiceRegistry(
         modelProvider: whisperModelManager,
         addonLocalModelCatalog: addonLocalModelCatalog,
         modelsDirectory: whisperModelManager.modelsDirectory,
@@ -25,10 +25,9 @@ final class ModelPrewarmService: ObservableObject {
         self.whisperModelManager = whisperModelManager
         self.addonLocalModelCatalog = addonLocalModelCatalog
         self.modelContext = modelContext
-        self.modelPreparationCoordinator = AddonAwareModelPreparationCoordinator(
+        self.modelPreparationCoordinator = AddonAwareTranscriptionSupport.makeModelPreparationCoordinator(
             whisperModelManager: whisperModelManager,
-            addonLocalModelCatalog: addonLocalModelCatalog,
-            fluidAudioTranscriptionService: FluidAudioTranscriptionService()
+            addonLocalModelCatalog: addonLocalModelCatalog
         )
         setupNotifications()
         schedulePrewarmOnAppLaunch()

@@ -113,7 +113,7 @@ class AudioTranscriptionManager: ObservableObject {
     }
 
     private func processItem(_ item: AudioFileQueueItem, modelContext: ModelContext, engine: VoiceInkEngine) async {
-        let serviceRegistry = AddonAwareTranscriptionServiceRegistry(
+        let serviceRegistry = AddonAwareTranscriptionSupport.makeServiceRegistry(
             modelProvider: engine.whisperModelManager,
             addonLocalModelCatalog: engine.addonLocalModelCatalog,
             modelsDirectory: engine.whisperModelManager.modelsDirectory,

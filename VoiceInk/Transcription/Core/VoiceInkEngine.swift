@@ -47,16 +47,15 @@ class VoiceInkEngine: NSObject, ObservableObject {
             .appendingPathComponent("com.prakashjoshipax.VoiceInk")
         self.recordingsDirectory = appSupportDirectory.appendingPathComponent("Recordings")
 
-        self.serviceRegistry = AddonAwareTranscriptionServiceRegistry(
+        self.serviceRegistry = AddonAwareTranscriptionSupport.makeServiceRegistry(
             modelProvider: whisperModelManager,
             addonLocalModelCatalog: addonLocalModelCatalog,
             modelsDirectory: whisperModelManager.modelsDirectory,
             modelContext: modelContext
         )
-        self.modelPreparationCoordinator = AddonAwareModelPreparationCoordinator(
+        self.modelPreparationCoordinator = AddonAwareTranscriptionSupport.makeModelPreparationCoordinator(
             whisperModelManager: whisperModelManager,
-            addonLocalModelCatalog: addonLocalModelCatalog,
-            fluidAudioTranscriptionService: serviceRegistry.fluidAudioTranscriptionService
+            addonLocalModelCatalog: addonLocalModelCatalog
         )
         self.pipeline = TranscriptionPipeline(
             modelContext: modelContext,

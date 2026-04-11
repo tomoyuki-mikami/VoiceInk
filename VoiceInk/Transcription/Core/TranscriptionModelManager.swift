@@ -7,8 +7,8 @@ class TranscriptionModelManager: ObservableObject {
     @Published var currentTranscriptionModel: (any TranscriptionModel)?
     @Published var allAvailableModels: [any TranscriptionModel] = PredefinedModels.models
 
-    internal weak var whisperModelManager: WhisperModelManager?
-    internal weak var fluidAudioModelManager: FluidAudioModelManager?
+    private weak var whisperModelManager: WhisperModelManager?
+    private weak var fluidAudioModelManager: FluidAudioModelManager?
 
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionModelManager")
 

@@ -19,11 +19,15 @@ extension VoiceInkEngine: PowerModeStateProvider {
         transcriptionModelManager.setDefaultTranscriptionModel(model)
     }
 
+    var availableModels: [WhisperModel] {
+        whisperModelManager.availableModels
+    }
+
     func cleanupModelResources() async {
         await cleanupResources()
     }
 
-    func prepareTranscriptionModel(_ model: any TranscriptionModel) async throws {
-        try await prepareSelectedModel(model)
+    func loadModel(_ model: WhisperModel) async throws {
+        try await whisperModelManager.loadModel(model)
     }
 }

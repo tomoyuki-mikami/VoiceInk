@@ -24,6 +24,7 @@ class PowerModeSessionManager {
     private var isApplyingPowerModeConfig = false
 
     private weak var stateProvider: (any PowerModeStateProvider)?
+    private weak var addonPowerModePreparer: (any AddonPowerModePreparing)?
     private var enhancementService: AIEnhancementService?
 
     private init() {
@@ -33,6 +34,7 @@ class PowerModeSessionManager {
     /// Configure with new VoiceInkEngine-based provider.
     func configure(engine: any PowerModeStateProvider, enhancementService: AIEnhancementService) {
         self.stateProvider = engine
+        self.addonPowerModePreparer = engine as? any AddonPowerModePreparing
         self.enhancementService = enhancementService
     }
 
@@ -137,7 +139,7 @@ class PowerModeSessionManager {
         }
 
         if let modelName = config.selectedTranscriptionModelName,
-           let selectedModel = stateProvider.allAvailableModels.first(where: { $0.name == modelName }),
+           let selectedModel = await stateProvider.allAvailableModels.first(where: { $0.name == modelName }),
            stateProvider.currentTranscriptionModel?.name != modelName {
             await handleModelChange(to: selectedModel)
         }
@@ -172,7 +174,7 @@ class PowerModeSessionManager {
         }
 
         if let modelName = state.transcriptionModelName,
-           let selectedModel = stateProvider.allAvailableModels.first(where: { $0.name == modelName }),
+           let selectedModel = await stateProvider.allAvailableModels.first(where: { $0.name == modelName }),
            stateProvider.currentTranscriptionModel?.name != modelName {
             await handleModelChange(to: selectedModel)
         }
@@ -181,23 +183,42 @@ class PowerModeSessionManager {
     private func handleModelChange(to newModel: any TranscriptionModel) async {
         guard let stateProvider = stateProvider else { return }
 
-        stateProvider.setDefaultTranscriptionModel(newModel)
-        await stateProvider.cleanupModelResources()
+        await stateProvider.setDefaultTranscriptionModel(newModel)
 
         switch newModel.provider {
-        case .local, .fluidAudio:
-            do {
-                try await stateProvider.prepareTranscriptionModel(newModel)
-            } catch {
-                print("Power Mode: Failed to prepare model '\(newModel.name)': \(error)")
+        case .local:
+            await stateProvider.cleanupModelResources()
+
+            if addonPowerModePreparer?.canPrepareForPowerMode(newModel) == true {
+                do {
+                    try await addonPowerModePreparer?.prepareTranscriptionModel(newModel)
+                } catch {
+                    print("Power Mode: Failed to prepare model '\(newModel.name)': \(error)")
+                }
+            } else if let localModel = await stateProvider.availableModels.first(where: { $0.name == newModel.name }) {
+                do {
+                    try await stateProvider.loadModel(localModel)
+                } catch {
+                    print("Power Mode: Failed to load local model '\(localModel.name)': \(error)")
+                }
+            }
+        case .fluidAudio:
+            await stateProvider.cleanupModelResources()
+
+            if addonPowerModePreparer?.canPrepareForPowerMode(newModel) == true {
+                do {
+                    try await addonPowerModePreparer?.prepareTranscriptionModel(newModel)
+                } catch {
+                    print("Power Mode: Failed to prepare model '\(newModel.name)': \(error)")
+                }
             }
         default:
-            break
+            await stateProvider.cleanupModelResources()
         }
     }
 
     private func recoverSession() {
-        guard loadSession() != nil else { return }
+        guard let session = loadSession() else { return }
         print("Recovering abandoned Power Mode session.")
         Task {
             await endSession()

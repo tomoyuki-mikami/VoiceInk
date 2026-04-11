@@ -1,9 +1,11 @@
 import Foundation
 import SwiftData
+import os
 
 @MainActor
 final class AddonAwareTranscriptionServiceRegistry: TranscriptionServiceRegistry {
     private weak var addonLocalModelCatalog: AddonLocalModelCatalog?
+    private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "AddonAwareTranscriptionServiceRegistry")
 
     init(
         modelProvider: any LocalModelProvider,
@@ -34,15 +36,6 @@ final class AddonAwareTranscriptionServiceRegistry: TranscriptionServiceRegistry
         }
 
         return super.createSession(for: model, onPartialTranscript: onPartialTranscript)
-    }
-
-    override func prepareModelIfNeeded(_ model: any TranscriptionModel) async throws {
-        if let addonModel = model as? any AddonLocalModel {
-            try await addonLocalModelCatalog?.prepareModel(addonModel)
-            return
-        }
-
-        try await super.prepareModelIfNeeded(model)
     }
 
     override func cleanup() async {
