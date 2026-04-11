@@ -12,7 +12,18 @@ struct VoiceInkApp: App {
     let container: ModelContainer
     let containerInitializationFailed: Bool
 
-    @StateObject private var runtime: VoiceInkAppRuntime
+    @StateObject private var engine: VoiceInkEngine
+    @StateObject private var whisperModelManager: WhisperModelManager
+    @StateObject private var addonLocalModelCatalog: AddonLocalModelCatalog
+    @StateObject private var fluidAudioModelManager: FluidAudioModelManager
+    @StateObject private var transcriptionModelManager: TranscriptionModelManager
+    @StateObject private var recorderUIManager: RecorderUIManager
+    @StateObject private var hotkeyManager: HotkeyManager
+    @StateObject private var updaterViewModel: UpdaterViewModel
+    @StateObject private var menuBarManager: MenuBarManager
+    @StateObject private var aiService = AIService()
+    @StateObject private var enhancementService: AIEnhancementService
+    @StateObject private var activeWindowService = ActiveWindowService.shared
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("enableAnnouncements") private var enableAnnouncements = true
     @State private var showMenuBarIcon = true
@@ -22,6 +33,9 @@ struct VoiceInkApp: App {
 
     // Transcription auto-cleanup service for zero data retention
     private let transcriptionAutoCleanupService = TranscriptionAutoCleanupService.shared
+
+    // Model prewarm service for optimizing model on wake from sleep
+    @StateObject private var prewarmService: ModelPrewarmService
 
     init() {
         // Disable HTTP response caching — prevents API responses from being stored in Cache.db
@@ -76,10 +90,80 @@ struct VoiceInkApp: App {
 
         containerInitializationFailed = initializationFailed
 
-        let runtime = VoiceInkAppRuntime(container: container)
-        _runtime = StateObject(wrappedValue: runtime)
+        let aiService = AIService()
+        _aiService = StateObject(wrappedValue: aiService)
 
-        appDelegate.menuBarManager = runtime.menuBarManager
+        let updaterViewModel = UpdaterViewModel()
+        _updaterViewModel = StateObject(wrappedValue: updaterViewModel)
+
+        let enhancementService = AIEnhancementService(aiService: aiService, modelContext: container.mainContext)
+        _enhancementService = StateObject(wrappedValue: enhancementService)
+
+        let appSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.prakashjoshipax.VoiceInk")
+        let whisperModelsDirectory = appSupportDirectory.appendingPathComponent("WhisperModels")
+        let qwenModelsDirectory = appSupportDirectory.appendingPathComponent("QwenModels")
+
+        let whisperModelManager = WhisperModelManager(modelsDirectory: whisperModelsDirectory)
+        let qwenModelManager = QwenModelManager(modelsDirectory: qwenModelsDirectory)
+        let addonLocalModelCatalog = AddonLocalModelCatalog(qwenModelManager: qwenModelManager)
+        let fluidAudioModelManager = FluidAudioModelManager()
+        let transcriptionModelManager = AddonAwareTranscriptionModelManager(
+            whisperModelManager: whisperModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog,
+            fluidAudioModelManager: fluidAudioModelManager
+        )
+
+        let recorderUIManager = RecorderUIManager()
+        let engine = VoiceInkEngine(
+            modelContext: container.mainContext,
+            whisperModelManager: whisperModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog,
+            transcriptionModelManager: transcriptionModelManager,
+            enhancementService: enhancementService
+        )
+        recorderUIManager.configure(engine: engine, recorder: engine.recorder)
+        engine.recorderUIManager = recorderUIManager
+
+        // refreshAllAvailableModels must run before loadCurrentTranscriptionModel so imported models are present when restoring the saved selection.
+        whisperModelManager.createModelsDirectoryIfNeeded()
+        whisperModelManager.loadAvailableModels()
+        addonLocalModelCatalog.createModelsDirectoryIfNeeded()
+        addonLocalModelCatalog.refreshAvailableModels()
+        transcriptionModelManager.refreshAllAvailableModels()
+        transcriptionModelManager.loadCurrentTranscriptionModel()
+
+        _whisperModelManager = StateObject(wrappedValue: whisperModelManager)
+        _addonLocalModelCatalog = StateObject(wrappedValue: addonLocalModelCatalog)
+        _fluidAudioModelManager = StateObject(wrappedValue: fluidAudioModelManager)
+        _transcriptionModelManager = StateObject(wrappedValue: transcriptionModelManager)
+        _recorderUIManager = StateObject(wrappedValue: recorderUIManager)
+        _engine = StateObject(wrappedValue: engine)
+
+        let hotkeyManager = HotkeyManager(engine: engine, recorderUIManager: recorderUIManager)
+        _hotkeyManager = StateObject(wrappedValue: hotkeyManager)
+
+        let menuBarManager = MenuBarManager()
+        _menuBarManager = StateObject(wrappedValue: menuBarManager)
+        menuBarManager.configure(modelContainer: container, engine: engine)
+
+        let activeWindowService = ActiveWindowService.shared
+        activeWindowService.configure(with: enhancementService)
+        _activeWindowService = StateObject(wrappedValue: activeWindowService)
+
+        let prewarmService = ModelPrewarmService(
+            transcriptionModelManager: transcriptionModelManager,
+            whisperModelManager: whisperModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog,
+            modelContext: container.mainContext
+        )
+        _prewarmService = StateObject(wrappedValue: prewarmService)
+
+        appDelegate.menuBarManager = menuBarManager
+
+        Task {
+            await recorderUIManager.resetOnLaunch()
+        }
 
         AppShortcuts.updateAppShortcutParameters()
 
@@ -165,7 +249,17 @@ struct VoiceInkApp: App {
         WindowGroup {
             if hasCompletedOnboarding {
                 ContentView()
-                    .voiceInkSharedEnvironment(runtime)
+                    .environmentObject(engine)
+                    .environmentObject(whisperModelManager)
+                    .environmentObject(addonLocalModelCatalog)
+                    .environmentObject(fluidAudioModelManager)
+                    .environmentObject(transcriptionModelManager)
+                    .environmentObject(recorderUIManager)
+                    .environmentObject(hotkeyManager)
+                    .environmentObject(updaterViewModel)
+                    .environmentObject(menuBarManager)
+                    .environmentObject(aiService)
+                    .environmentObject(enhancementService)
                     .modelContainer(container)
                     .onAppear {
                         // Check if container initialization failed
@@ -184,7 +278,7 @@ struct VoiceInkApp: App {
                         // Migrate dictionary data from UserDefaults to SwiftData (one-time operation)
                         DictionaryMigrationService.shared.migrateIfNeeded(context: container.mainContext)
 
-                        runtime.updaterViewModel.silentlyCheckForUpdates()
+                        updaterViewModel.silentlyCheckForUpdates()
                         if enableAnnouncements {
                             AnnouncementsService.shared.start()
                         }
@@ -208,14 +302,22 @@ struct VoiceInkApp: App {
                     })
                     .onDisappear {
                         AnnouncementsService.shared.stop()
-                        runtime.whisperModelManager.unloadModel()
+                        whisperModelManager.unloadModel()
 
                         // Stop the automatic audio cleanup process
                         audioCleanupManager.stopAutomaticCleanup()
                     }
             } else {
                 OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
-                    .voiceInkSharedEnvironment(runtime)
+                    .environmentObject(hotkeyManager)
+                    .environmentObject(engine)
+                    .environmentObject(whisperModelManager)
+                    .environmentObject(addonLocalModelCatalog)
+                    .environmentObject(fluidAudioModelManager)
+                    .environmentObject(transcriptionModelManager)
+                    .environmentObject(recorderUIManager)
+                    .environmentObject(aiService)
+                    .environmentObject(enhancementService)
                     .frame(minWidth: 880, minHeight: 780)
                     .background(WindowAccessor { window in
                         if window.identifier == nil || window.identifier != NSUserInterfaceItemIdentifier("com.prakashjoshipax.voiceink.onboardingWindow") {
@@ -231,13 +333,23 @@ struct VoiceInkApp: App {
             CommandGroup(replacing: .newItem) { }
 
             CommandGroup(after: .appInfo) {
-                CheckForUpdatesView(updaterViewModel: runtime.updaterViewModel)
+                CheckForUpdatesView(updaterViewModel: updaterViewModel)
             }
         }
 
         MenuBarExtra(isInserted: $showMenuBarIcon) {
             MenuBarView()
-                .voiceInkSharedEnvironment(runtime)
+                .environmentObject(engine)
+                .environmentObject(whisperModelManager)
+                .environmentObject(addonLocalModelCatalog)
+                .environmentObject(fluidAudioModelManager)
+                .environmentObject(transcriptionModelManager)
+                .environmentObject(recorderUIManager)
+                .environmentObject(hotkeyManager)
+                .environmentObject(menuBarManager)
+                .environmentObject(updaterViewModel)
+                .environmentObject(aiService)
+                .environmentObject(enhancementService)
         } label: {
             let image: NSImage = {
                 let ratio = $0.size.height / $0.size.width
@@ -253,7 +365,7 @@ struct VoiceInkApp: App {
         #if DEBUG
         WindowGroup("Debug") {
             Button("Toggle Menu Bar Only") {
-                runtime.menuBarManager.isMenuBarOnly.toggle()
+                menuBarManager.isMenuBarOnly.toggle()
             }
         }
         #endif

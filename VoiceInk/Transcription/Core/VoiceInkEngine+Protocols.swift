@@ -15,12 +15,12 @@ extension VoiceInkEngine: PowerModeStateProvider {
         transcriptionModelManager.allAvailableModels
     }
 
-    func setDefaultTranscriptionModel(_ model: any TranscriptionModel) {
-        transcriptionModelManager.setDefaultTranscriptionModel(model)
-    }
-
     var availableModels: [WhisperModel] {
         whisperModelManager.availableModels
+    }
+
+    func setDefaultTranscriptionModel(_ model: any TranscriptionModel) {
+        transcriptionModelManager.setDefaultTranscriptionModel(model)
     }
 
     func cleanupModelResources() async {
