@@ -25,12 +25,7 @@ class AudioTranscriptionService: ObservableObject {
     init(modelContext: ModelContext, engine: VoiceInkEngine) {
         self.modelContext = modelContext
         self.enhancementService = engine.enhancementService
-        self.serviceRegistry = AddonAwareTranscriptionSupport.makeServiceRegistry(
-            modelProvider: engine.whisperModelManager,
-            addonLocalModelCatalog: engine.addonLocalModelCatalog,
-            modelsDirectory: engine.whisperModelManager.modelsDirectory,
-            modelContext: modelContext
-        )
+        self.serviceRegistry = engine.serviceRegistry
     }
 
     init(modelContext: ModelContext, serviceRegistry: TranscriptionServiceRegistry, enhancementService: AIEnhancementService?) {

@@ -24,7 +24,6 @@ class PowerModeSessionManager {
     private var isApplyingPowerModeConfig = false
 
     private weak var stateProvider: (any PowerModeStateProvider)?
-    private weak var addonPowerModePreparer: (any AddonPowerModePreparing)?
     private var enhancementService: AIEnhancementService?
 
     private init() {
@@ -34,7 +33,6 @@ class PowerModeSessionManager {
     /// Configure with new VoiceInkEngine-based provider.
     func configure(engine: any PowerModeStateProvider, enhancementService: AIEnhancementService) {
         self.stateProvider = engine
-        self.addonPowerModePreparer = engine as? any AddonPowerModePreparing
         self.enhancementService = enhancementService
     }
 
@@ -188,14 +186,7 @@ class PowerModeSessionManager {
         switch newModel.provider {
         case .local:
             await stateProvider.cleanupModelResources()
-
-            if addonPowerModePreparer?.canPrepareForPowerMode(newModel) == true {
-                do {
-                    try await addonPowerModePreparer?.prepareTranscriptionModel(newModel)
-                } catch {
-                    print("Power Mode: Failed to prepare model '\(newModel.name)': \(error)")
-                }
-            } else if let localModel = await stateProvider.availableModels.first(where: { $0.name == newModel.name }) {
+            if let localModel = await stateProvider.availableModels.first(where: { $0.name == newModel.name }) {
                 do {
                     try await stateProvider.loadModel(localModel)
                 } catch {
@@ -204,14 +195,6 @@ class PowerModeSessionManager {
             }
         case .fluidAudio:
             await stateProvider.cleanupModelResources()
-
-            if addonPowerModePreparer?.canPrepareForPowerMode(newModel) == true {
-                do {
-                    try await addonPowerModePreparer?.prepareTranscriptionModel(newModel)
-                } catch {
-                    print("Power Mode: Failed to prepare model '\(newModel.name)': \(error)")
-                }
-            }
         default:
             await stateProvider.cleanupModelResources()
         }

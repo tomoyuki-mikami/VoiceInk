@@ -250,6 +250,7 @@ struct ModelManagementView: View {
                             deleteActionClosure = request.action
                             isShowingDeleteAlert = true
                         }
+
                     }
 
                     if selectedFilter == .custom {
