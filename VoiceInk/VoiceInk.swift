@@ -14,6 +14,7 @@ struct VoiceInkApp: App {
 
     @StateObject private var engine: VoiceInkEngine
     @StateObject private var whisperModelManager: WhisperModelManager
+    @StateObject private var addonLocalModelCatalog: AddonLocalModelCatalog
     @StateObject private var fluidAudioModelManager: FluidAudioModelManager
     @StateObject private var transcriptionModelManager: TranscriptionModelManager
     @StateObject private var recorderUIManager: RecorderUIManager
@@ -89,7 +90,6 @@ struct VoiceInkApp: App {
 
         containerInitializationFailed = initializationFailed
 
-        // Initialize services with proper sharing of instances
         let aiService = AIService()
         _aiService = StateObject(wrappedValue: aiService)
 
@@ -99,48 +99,47 @@ struct VoiceInkApp: App {
         let enhancementService = AIEnhancementService(aiService: aiService, modelContext: container.mainContext)
         _enhancementService = StateObject(wrappedValue: enhancementService)
 
-        // 1. Create modelsDirectory URL
         let appSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("com.prakashjoshipax.VoiceInk")
-        let modelsDirectory = appSupportDirectory.appendingPathComponent("WhisperModels")
+        let whisperModelsDirectory = appSupportDirectory.appendingPathComponent("WhisperModels")
+        let qwenModelsDirectory = appSupportDirectory.appendingPathComponent("QwenModels")
 
-        // 2. Create model managers
-        let whisperModelManager = WhisperModelManager(modelsDirectory: modelsDirectory)
+        let whisperModelManager = WhisperModelManager(modelsDirectory: whisperModelsDirectory)
+        let qwenModelManager = QwenModelManager(modelsDirectory: qwenModelsDirectory)
+        let addonLocalModelCatalog = AddonLocalModelCatalog(qwenModelManager: qwenModelManager)
         let fluidAudioModelManager = FluidAudioModelManager()
-        let transcriptionModelManager = TranscriptionModelManager(
+        let transcriptionModelManager = AddonAwareTranscriptionModelManager(
             whisperModelManager: whisperModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog,
             fluidAudioModelManager: fluidAudioModelManager
         )
 
-        // 3. Create UI manager
         let recorderUIManager = RecorderUIManager()
-
-        // 4. Create engine
         let engine = VoiceInkEngine(
             modelContext: container.mainContext,
             whisperModelManager: whisperModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog,
             transcriptionModelManager: transcriptionModelManager,
             enhancementService: enhancementService
         )
-
-        // 5. Configure circular deps
         recorderUIManager.configure(engine: engine, recorder: engine.recorder)
         engine.recorderUIManager = recorderUIManager
 
-        // 6. Initialize model state
         // refreshAllAvailableModels must run before loadCurrentTranscriptionModel so imported models are present when restoring the saved selection.
         whisperModelManager.createModelsDirectoryIfNeeded()
         whisperModelManager.loadAvailableModels()
+        addonLocalModelCatalog.createModelsDirectoryIfNeeded()
+        addonLocalModelCatalog.refreshAvailableModels()
         transcriptionModelManager.refreshAllAvailableModels()
         transcriptionModelManager.loadCurrentTranscriptionModel()
 
         _whisperModelManager = StateObject(wrappedValue: whisperModelManager)
+        _addonLocalModelCatalog = StateObject(wrappedValue: addonLocalModelCatalog)
         _fluidAudioModelManager = StateObject(wrappedValue: fluidAudioModelManager)
         _transcriptionModelManager = StateObject(wrappedValue: transcriptionModelManager)
         _recorderUIManager = StateObject(wrappedValue: recorderUIManager)
         _engine = StateObject(wrappedValue: engine)
 
-        // 7. Create other services that depend on engine
         let hotkeyManager = HotkeyManager(engine: engine, recorderUIManager: recorderUIManager)
         _hotkeyManager = StateObject(wrappedValue: hotkeyManager)
 
@@ -161,7 +160,6 @@ struct VoiceInkApp: App {
 
         appDelegate.menuBarManager = menuBarManager
 
-        // Ensure no lingering recording state from previous runs
         Task {
             await recorderUIManager.resetOnLaunch()
         }
@@ -252,6 +250,7 @@ struct VoiceInkApp: App {
                 ContentView()
                     .environmentObject(engine)
                     .environmentObject(whisperModelManager)
+                    .environmentObject(addonLocalModelCatalog)
                     .environmentObject(fluidAudioModelManager)
                     .environmentObject(transcriptionModelManager)
                     .environmentObject(recorderUIManager)
@@ -312,6 +311,7 @@ struct VoiceInkApp: App {
                     .environmentObject(hotkeyManager)
                     .environmentObject(engine)
                     .environmentObject(whisperModelManager)
+                    .environmentObject(addonLocalModelCatalog)
                     .environmentObject(fluidAudioModelManager)
                     .environmentObject(transcriptionModelManager)
                     .environmentObject(recorderUIManager)
@@ -340,6 +340,7 @@ struct VoiceInkApp: App {
             MenuBarView()
                 .environmentObject(engine)
                 .environmentObject(whisperModelManager)
+                .environmentObject(addonLocalModelCatalog)
                 .environmentObject(fluidAudioModelManager)
                 .environmentObject(transcriptionModelManager)
                 .environmentObject(recorderUIManager)

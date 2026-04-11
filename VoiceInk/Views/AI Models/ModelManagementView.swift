@@ -13,6 +13,7 @@ enum ModelFilter: String, CaseIterable, Identifiable {
 
 struct ModelManagementView: View {
     @EnvironmentObject private var whisperModelManager: WhisperModelManager
+    @EnvironmentObject private var addonLocalModelCatalog: AddonLocalModelCatalog
     @EnvironmentObject private var fluidAudioModelManager: FluidAudioModelManager
     @EnvironmentObject private var transcriptionModelManager: TranscriptionModelManager
     @State private var customModelToEdit: CustomCloudModel?
@@ -215,7 +216,7 @@ struct ModelManagementView: View {
                             } : nil
                         )
                     }
-                    
+
                     // Import button as a card at the end of the Local list
                     if selectedFilter == .local {
                         HStack(spacing: 8) {
@@ -238,8 +239,20 @@ struct ModelManagementView: View {
                             )
                             .help("Read more about custom local models")
                         }
+
+                        AddonAwareModelManagementContentView(
+                            selectedFilter: selectedFilter,
+                            addonLocalModelCatalog: addonLocalModelCatalog,
+                            transcriptionModelManager: transcriptionModelManager
+                        ) { request in
+                            alertTitle = request.title
+                            alertMessage = request.message
+                            deleteActionClosure = request.action
+                            isShowingDeleteAlert = true
+                        }
+
                     }
-                    
+
                     if selectedFilter == .custom {
                         HStack(spacing: 6) {
                             Image(systemName: "info.circle")
@@ -263,8 +276,6 @@ struct ModelManagementView: View {
             }
         .padding()
     }
-
-
 
     private var intelMacWarningBanner: some View {
         HStack(spacing: 10) {

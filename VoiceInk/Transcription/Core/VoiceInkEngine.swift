@@ -18,6 +18,7 @@ class VoiceInkEngine: NSObject, ObservableObject {
 
     // Injected managers
     let whisperModelManager: WhisperModelManager
+    let addonLocalModelCatalog: AddonLocalModelCatalog
     let transcriptionModelManager: TranscriptionModelManager
     weak var recorderUIManager: RecorderUIManager?
 
@@ -25,17 +26,20 @@ class VoiceInkEngine: NSObject, ObservableObject {
     internal let serviceRegistry: TranscriptionServiceRegistry
     let enhancementService: AIEnhancementService?
     private let pipeline: TranscriptionPipeline
+    private let modelPreparationCoordinator: AddonAwareModelPreparationCoordinator
 
     let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "VoiceInkEngine")
 
     init(
         modelContext: ModelContext,
         whisperModelManager: WhisperModelManager,
+        addonLocalModelCatalog: AddonLocalModelCatalog,
         transcriptionModelManager: TranscriptionModelManager,
         enhancementService: AIEnhancementService? = nil
     ) {
         self.modelContext = modelContext
         self.whisperModelManager = whisperModelManager
+        self.addonLocalModelCatalog = addonLocalModelCatalog
         self.transcriptionModelManager = transcriptionModelManager
         self.enhancementService = enhancementService
 
@@ -43,10 +47,15 @@ class VoiceInkEngine: NSObject, ObservableObject {
             .appendingPathComponent("com.prakashjoshipax.VoiceInk")
         self.recordingsDirectory = appSupportDirectory.appendingPathComponent("Recordings")
 
-        self.serviceRegistry = TranscriptionServiceRegistry(
+        self.serviceRegistry = AddonAwareTranscriptionSupport.makeServiceRegistry(
             modelProvider: whisperModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog,
             modelsDirectory: whisperModelManager.modelsDirectory,
             modelContext: modelContext
+        )
+        self.modelPreparationCoordinator = AddonAwareTranscriptionSupport.makeModelPreparationCoordinator(
+            whisperModelManager: whisperModelManager,
+            addonLocalModelCatalog: addonLocalModelCatalog
         )
         self.pipeline = TranscriptionPipeline(
             modelContext: modelContext,
@@ -181,18 +190,12 @@ class VoiceInkEngine: NSObject, ObservableObject {
                             Task.detached { [weak self] in
                                 guard let self else { return }
 
-                                if let model = await self.transcriptionModelManager.currentTranscriptionModel,
-                                   model.provider == .local {
-                                    if let localWhisperModel = await self.whisperModelManager.availableModels.first(where: { $0.name == model.name }),
-                                       await self.whisperModelManager.whisperContext == nil {
-                                        do {
-                                            try await self.whisperModelManager.loadModel(localWhisperModel)
-                                        } catch {
-                                            await self.logger.error("❌ Model loading failed: \(error.localizedDescription, privacy: .public)")
-                                        }
+                                if let model = await self.transcriptionModelManager.currentTranscriptionModel {
+                                    do {
+                                        try await self.modelPreparationCoordinator.prepareTranscriptionModel(model)
+                                    } catch {
+                                        await self.logger.error("❌ Model loading failed: \(error.localizedDescription, privacy: .public)")
                                     }
-                                } else if let fluidAudioModel = await self.transcriptionModelManager.currentTranscriptionModel as? FluidAudioModel {
-                                    try? await self.serviceRegistry.fluidAudioTranscriptionService.loadModel(for: fluidAudioModel)
                                 }
 
                                 if let enhancementService = await self.enhancementService {
@@ -260,6 +263,10 @@ class VoiceInkEngine: NSObject, ObservableObject {
         await whisperModelManager.cleanupResources()
         await serviceRegistry.cleanup()
         logger.notice("cleanupResources: completed")
+    }
+
+    func prepareSelectedModel(_ model: any TranscriptionModel) async throws {
+        try await modelPreparationCoordinator.prepareTranscriptionModel(model)
     }
 
     // MARK: - Notification Handling
