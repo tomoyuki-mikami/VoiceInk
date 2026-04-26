@@ -8,7 +8,7 @@ final class AddonAwareTranscriptionServiceRegistry: TranscriptionServiceRegistry
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "AddonAwareTranscriptionServiceRegistry")
 
     init(
-        modelProvider: any LocalModelProvider,
+        modelProvider: any WhisperModelProvider,
         addonLocalModelCatalog: AddonLocalModelCatalog,
         modelsDirectory: URL,
         modelContext: ModelContext

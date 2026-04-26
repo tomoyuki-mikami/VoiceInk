@@ -34,7 +34,7 @@ final class AddonAwareTranscriptionModelManager: TranscriptionModelManager {
             }
 
             switch model.provider {
-            case .local:
+            case .whisper:
                 return whisperModelManagerRef?.availableModels.contains { $0.name == model.name } ?? false
             case .fluidAudio:
                 return fluidAudioModelManagerRef?.isFluidAudioModelDownloaded(named: model.name) ?? false
@@ -44,22 +44,13 @@ final class AddonAwareTranscriptionModelManager: TranscriptionModelManager {
                 } else {
                     return false
                 }
-            case .groq:
-                return APIKeyManager.shared.hasAPIKey(forProvider: "Groq")
-            case .elevenLabs:
-                return APIKeyManager.shared.hasAPIKey(forProvider: "ElevenLabs")
-            case .deepgram:
-                return APIKeyManager.shared.hasAPIKey(forProvider: "Deepgram")
-            case .mistral:
-                return APIKeyManager.shared.hasAPIKey(forProvider: "Mistral")
-            case .gemini:
-                return APIKeyManager.shared.hasAPIKey(forProvider: "Gemini")
-            case .soniox:
-                return APIKeyManager.shared.hasAPIKey(forProvider: "Soniox")
-            case .speechmatics:
-                return APIKeyManager.shared.hasAPIKey(forProvider: "Speechmatics")
             case .custom:
                 return true
+            default:
+                if let cloudProvider = CloudProviderRegistry.provider(for: model.provider) {
+                    return APIKeyManager.shared.hasAPIKey(forProvider: cloudProvider.providerKey)
+                }
+                return false
             }
         }
     }
@@ -70,15 +61,15 @@ final class AddonAwareTranscriptionModelManager: TranscriptionModelManager {
         if addonLocalModelCatalog?.contains(model) != true {
             addonLocalModelCatalog?.unloadModelResources()
         }
-    }
+        }
 
     override func refreshAllAvailableModels() {
         let currentModelName = currentTranscriptionModel?.name
-        var models = PredefinedModels.models
+        var models = TranscriptionModelRegistry.models
 
         for whisperModel in whisperModelManagerRef?.availableModels ?? [] {
             if !models.contains(where: { $0.name == whisperModel.name }) {
-                let importedModel = ImportedLocalModel(fileBaseName: whisperModel.name)
+                let importedModel = ImportedWhisperModel(fileBaseName: whisperModel.name)
                 models.append(importedModel)
             }
         }
@@ -96,7 +87,7 @@ final class AddonAwareTranscriptionModelManager: TranscriptionModelManager {
         if currentTranscriptionModel?.name == modelName {
             currentTranscriptionModel = nil
             UserDefaults.standard.removeObject(forKey: "CurrentTranscriptionModel")
-            whisperModelManagerRef?.loadedLocalModel = nil
+            whisperModelManagerRef?.loadedWhisperModel = nil
             whisperModelManagerRef?.isModelLoaded = false
             addonLocalModelCatalog?.unloadModelResources()
             UserDefaults.standard.removeObject(forKey: "CurrentModel")

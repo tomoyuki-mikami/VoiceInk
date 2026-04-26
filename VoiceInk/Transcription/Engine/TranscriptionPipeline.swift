@@ -51,14 +51,6 @@ class TranscriptionPipeline {
             return
         }
 
-        Task {
-            let isSystemMuteEnabled = UserDefaults.standard.bool(forKey: "isSystemMuteEnabled")
-            if isSystemMuteEnabled {
-                try? await Task.sleep(nanoseconds: 200_000_000)
-            }
-            SoundManager.shared.playStopSound()
-        }
-
         var finalPastedText: String?
         var promptDetectionResult: PromptDetectionService.PromptDetectionResult?
 
@@ -174,13 +166,8 @@ class TranscriptionPipeline {
                     """
             }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                // Capture element while target field still has focus, before Cmd+V fires
-                let autoLearn = AutoLearnVocabularyService.shared
-                if let element = autoLearn.captureFocusedElement() {
-                    autoLearn.prepareMonitoring(pastedText: textToPaste, element: element, modelContext: self.modelContext)
-                }
-
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.015) {
+                SoundManager.shared.playStopSound()
                 let appendSpace = UserDefaults.standard.bool(forKey: "AppendTrailingSpace")
                 CursorPaster.pasteAtCursor(textToPaste + (appendSpace ? " " : ""))
 
@@ -200,8 +187,5 @@ class TranscriptionPipeline {
         }
 
         await onDismiss()
-
-        // Start monitoring only after recorder is fully dismissed — no race with focus changes from our own UI
-        AutoLearnVocabularyService.shared.beginMonitoring()
     }
 }

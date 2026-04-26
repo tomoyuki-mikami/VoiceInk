@@ -105,7 +105,7 @@ struct QwenLocalModel: AddonLocalModel {
 
     static func supportedLanguageDictionary() -> [String: String] {
         let supportedCodes = Array(languageNames.keys) + ["auto"]
-        return PredefinedModels.allLanguages.filter { supportedCodes.contains($0.key) }
+        return LanguageDictionary.all.filter { supportedCodes.contains($0.key) }
     }
 
     let id = UUID()
@@ -119,7 +119,7 @@ struct QwenLocalModel: AddonLocalModel {
     let speed: Double
     let accuracy: Double
     let ramUsage: Double
-    let provider: ModelProvider = .local
+    let provider: ModelProvider = .whisper
     let addonIdentifier = "qwen3-asr"
 
     var isMultilingualModel: Bool {
@@ -159,7 +159,7 @@ struct CohereLocalModel: AddonLocalModel {
     ]
 
     static func supportedLanguageDictionary() -> [String: String] {
-        PredefinedModels.allLanguages.filter { languageNames[$0.key] != nil }
+        LanguageDictionary.all.filter { languageNames[$0.key] != nil }
     }
 
     let id = UUID()
@@ -170,7 +170,7 @@ struct CohereLocalModel: AddonLocalModel {
     let ramRequirement: String
     let supportedLanguages: [String: String]
     let description: String
-    let provider: ModelProvider = .local
+    let provider: ModelProvider = .whisper
     let addonIdentifier = "cohere-transcribe"
 
     var isMultilingualModel: Bool {
@@ -198,7 +198,7 @@ struct JapaneseParakeetLocalModel: AddonLocalModel {
     let speed: Double
     let accuracy: Double
     let ramUsage: Double
-    let provider: ModelProvider = .local
+    let provider: ModelProvider = .whisper
     let addonIdentifier = "parakeet-japanese"
 
     var isMultilingualModel: Bool {

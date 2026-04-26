@@ -22,7 +22,7 @@ final class AddonAwareModelPreparationCoordinator {
             return
         }
 
-        if model.provider == .local,
+        if model.provider == .whisper,
            let whisperModelManager,
            let localModel = whisperModelManager.availableModels.first(where: { $0.name == model.name }),
            whisperModelManager.whisperContext == nil {
@@ -41,7 +41,7 @@ final class AddonAwareModelPreparationCoordinator {
         }
 
         switch model.provider {
-        case .local, .fluidAudio:
+        case .whisper, .fluidAudio:
             return true
         default:
             return false

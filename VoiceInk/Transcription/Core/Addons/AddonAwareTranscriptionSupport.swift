@@ -4,7 +4,7 @@ import SwiftData
 @MainActor
 enum AddonAwareTranscriptionSupport {
     static func makeServiceRegistry(
-        modelProvider: any LocalModelProvider,
+        modelProvider: any WhisperModelProvider,
         addonLocalModelCatalog: AddonLocalModelCatalog,
         modelsDirectory: URL,
         modelContext: ModelContext
