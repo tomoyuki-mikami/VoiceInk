@@ -187,17 +187,15 @@ class AIEnhancementService: ObservableObject {
             ""
         }
 
-        let finalContextSection = allContextSections + customVocabularySection
-
         if let activePrompt = activePrompt {
             if activePrompt.id == PredefinedPrompts.assistantPromptId {
-                return activePrompt.promptText + finalContextSection
+                return activePrompt.promptText + customVocabularySection + allContextSections
             } else {
-                return activePrompt.finalPromptText + finalContextSection
+                return activePrompt.finalPromptText + customVocabularySection + allContextSections
             }
         } else {
             let defaultPrompt = allPrompts.first(where: { $0.id == PredefinedPrompts.defaultPromptId }) ?? allPrompts.first!
-            return defaultPrompt.finalPromptText + finalContextSection
+            return defaultPrompt.finalPromptText + customVocabularySection + allContextSections
         }
     }
 
